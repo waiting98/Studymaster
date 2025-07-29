@@ -1,0 +1,3585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudyMaster - Smart Learning Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        'primary-dark': '#4A49C7'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+        }
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #5D5CDE;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        .counter-animation {
+            animation: countUp 0.8s ease-out;
+        }
+        .question-transition {
+            transition: all 0.3s ease-in-out;
+        }
+        .notification-toast {
+            animation: slideInRight 0.3s ease-out;
+        }
+        .pulse-warning {
+            animation: pulse 2s infinite;
+        }
+        .explanation-card {
+            border-left: 4px solid #3B82F6;
+            background: linear-gradient(135deg, #EBF8FF 0%, #F0F9FF 100%);
+        }
+        .dark .explanation-card {
+            background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%);
+        }
+        .question-card {
+            background: linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 100%);
+            border: 1px solid #E2E8F0;
+        }
+        .dark .question-card {
+            background: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+            border: 1px solid #475569;
+        }
+        .answer-option {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+            border: 2px solid #E2E8F0;
+            transition: all 0.2s ease-in-out;
+        }
+        .dark .answer-option {
+            background: linear-gradient(135deg, #374151 0%, #4B5563 100%);
+            border: 2px solid #6B7280;
+        }
+        .answer-option:hover {
+            background: linear-gradient(135deg, #EBF4FF 0%, #DBEAFE 100%);
+            border-color: #3B82F6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        .dark .answer-option:hover {
+            background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);
+            border-color: #60A5FA;
+        }
+        .answer-correct {
+            background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%) !important;
+            border-color: #10B981 !important;
+            color: #065F46;
+        }
+        .dark .answer-correct {
+            background: linear-gradient(135deg, #064E3B 0%, #065F46 100%) !important;
+            border-color: #10B981 !important;
+            color: #A7F3D0;
+        }
+        .answer-incorrect {
+            background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%) !important;
+            border-color: #EF4444 !important;
+            color: #991B1B;
+        }
+        .dark .answer-incorrect {
+            background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%) !important;
+            border-color: #EF4444 !important;
+            color: #FCA5A5;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes countUp {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        @media (max-width: 480px) {
+            .mobile-optimized {
+                padding: 0.75rem;
+            }
+            .text-responsive {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <!-- Custom Modal Container -->
+    <div id="modal-container"></div>
+
+    <!-- Notification Toast Container -->
+    <div id="notification-toast-container" class="fixed top-4 right-4 z-50 space-y-3"></div>
+
+    <!-- Data Backup Warning -->
+    <div id="backup-warning" class="hidden fixed top-0 left-0 right-0 bg-yellow-500 text-white p-3 z-40">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <span class="pulse-warning">⚠️</span>
+                <span class="font-medium">Reminder: Your data is stored locally. Consider backing up regularly!</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="backup-now-btn" class="bg-yellow-600 hover:bg-yellow-700 px-3 py-1 rounded text-sm">Backup Now</button>
+                <button id="dismiss-warning-btn" class="hover:bg-yellow-600 px-2 py-1 rounded">×</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-primary text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <h1 class="text-xl md:text-2xl font-bold">📚 StudyMaster</h1>
+                <span class="hidden md:inline-block text-sm opacity-75">Smart Learning Platform</span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div id="header-actions" class="hidden space-x-2 md:space-x-4">
+                    <button id="data-backup-btn" class="admin-only hidden bg-green-500 hover:bg-green-600 px-3 py-2 md:px-4 rounded-lg transition-colors text-sm md:text-base" title="Backup Your Data">
+                        💾 Backup
+                    </button>
+                    <button id="logout-btn" class="bg-red-500 hover:bg-red-600 px-3 py-2 md:px-4 rounded-lg transition-colors text-sm md:text-base">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-2 md:px-4 py-4 md:py-6">
+        <!-- Welcome/Landing Section -->
+        <div id="landing-section" class="text-center mb-8">
+            <div class="bg-gradient-to-r from-primary to-purple-600 text-white p-8 md:p-12 rounded-xl shadow-xl mb-6">
+                <h2 class="text-3xl md:text-4xl font-bold mb-4">Welcome to StudyMaster! 🎓</h2>
+                <p class="text-lg md:text-xl mb-6 opacity-90">Website developed by Felicien</p>
+                <div class="flex flex-col md:flex-row gap-4 justify-center">
+                    <button id="try-guest-mode" class="bg-white text-primary hover:bg-gray-100 px-6 py-3 rounded-lg font-medium transition-colors">
+                        🚀 Try Guest Mode
+                    </button>
+                    <button id="go-to-login" class="bg-transparent border-2 border-white text-white hover:bg-white hover:text-primary px-6 py-3 rounded-lg font-medium transition-colors">
+                        👤 Login / Register
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Features Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <div class="text-4xl mb-4">🧠</div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Smart Study Sessions</h3>
+                    <p class="text-gray-600 dark:text-gray-400">Adaptive learning with progress tracking and detailed explanations</p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <div class="text-4xl mb-4">📊</div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Progress Analytics</h3>
+                    <p class="text-gray-600 dark:text-gray-400">Detailed insights into your learning journey and performance metrics</p>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <div class="text-4xl mb-4">🔒</div>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">Secure & Private</h3>
+                    <p class="text-gray-600 dark:text-gray-400">Your data stays private with encrypted storage and backup options</p>
+                </div>
+            </div>
+
+            <!-- Data Security Notice -->
+            <div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 p-4 rounded-lg">
+                <div class="flex items-start space-x-3">
+                    <span class="text-blue-500 text-xl">🛡️</span>
+                    <div class="text-left">
+                        <h4 class="font-medium text-blue-700 dark:text-blue-300 mb-1">Data Privacy & Security</h4>
+                        <p class="text-blue-600 dark:text-blue-400 text-sm">Your data is stored locally in your browser with password encryption. Use the backup feature to save your progress to external storage.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="auth-section" class="hidden flex justify-center">
+            <div class="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-xl shadow-lg w-full max-w-md">
+                <div class="text-center mb-6">
+                    <h2 id="auth-title" class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-2">Login</h2>
+                    <p class="text-gray-600 dark:text-gray-400 text-sm">Access your personal study dashboard</p>
+                </div>
+                
+                <div id="auth-error" class="text-red-500 text-sm mb-4 hidden"></div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label for="auth-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                        <input type="email" id="auth-email" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Enter your email">
+                    </div>
+                    
+                    <div class="relative">
+                        <label for="auth-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                        <input type="password" id="auth-password" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary pr-12" placeholder="Enter your password">
+                        <button type="button" id="toggle-login-password" class="absolute right-3 top-9 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            👁️
+                        </button>
+                    </div>
+                    
+                    <div id="register-fields" class="hidden space-y-4">
+                        <div>
+                            <label for="auth-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
+                            <input type="text" id="auth-name" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Enter your full name">
+                        </div>
+                        
+                        <div class="relative">
+                            <label for="auth-register-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                            <input type="password" id="auth-register-password" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary pr-12" placeholder="Create a strong password">
+                            <button type="button" id="toggle-register-password" class="absolute right-3 top-9 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                👁️
+                            </button>
+                        </div>
+                        
+                        <div class="relative">
+                            <label for="auth-confirm-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confirm Password</label>
+                            <input type="password" id="auth-confirm-password" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary pr-12" placeholder="Confirm your password">
+                        </div>
+                        
+                        <input type="hidden" id="auth-role" value="user">
+                    </div>
+                    
+                    <button id="auth-submit" class="w-full bg-primary hover:bg-primary-dark text-white py-3 rounded-lg font-medium transition-colors">
+                        Login
+                    </button>
+                    
+                    <button id="auth-toggle" class="w-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 py-3 rounded-lg font-medium transition-colors">
+                        Switch to Register
+                    </button>
+
+                    <button id="forgot-password-btn" class="w-full text-primary hover:text-primary-dark text-sm">
+                        Forgot Password?
+                    </button>
+
+                    <div class="text-center">
+                        <button id="back-to-landing" class="text-primary hover:text-primary-dark text-sm">← Back to Home</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="app-section" class="hidden">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+                <div>
+                    <h2 id="welcome-message" class="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Welcome back!</h2>
+                    <div id="user-role-badge" class="mt-1"></div>
+                </div>
+                <div id="last-backup-info" class="admin-only hidden text-sm text-gray-600 dark:text-gray-400 mt-2 md:mt-0">
+                    <span id="last-backup-text">Never backed up</span>
+                </div>
+            </div>
+
+            <!-- Live Statistics Dashboard -->
+            <div id="stats-dashboard" class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6">
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg text-center">
+                    <div class="text-2xl md:text-3xl font-bold text-blue-500 counter-animation" id="live-attempted">0</div>
+                    <div class="text-xs md:text-sm text-gray-600 dark:text-gray-400">Questions Attempted</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg text-center">
+                    <div class="text-2xl md:text-3xl font-bold text-green-500 counter-animation" id="live-correct">0</div>
+                    <div class="text-xs md:text-sm text-gray-600 dark:text-gray-400">Correct Answers</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg text-center">
+                    <div class="text-2xl md:text-3xl font-bold text-orange-500 counter-animation" id="live-streak">0</div>
+                    <div class="text-xs md:text-sm text-gray-600 dark:text-gray-400">Current Streak</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg text-center">
+                    <div class="text-2xl md:text-3xl font-bold text-purple-500 counter-animation" id="live-accuracy">0%</div>
+                    <div class="text-xs md:text-sm text-gray-600 dark:text-gray-400">Accuracy Rate</div>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+                <nav class="flex flex-wrap -mb-px overflow-x-auto">
+                    <button class="nav-tab active mr-2 py-2 px-3 md:px-4 border-b-2 border-primary text-primary font-medium whitespace-nowrap" data-tab="study-tab">📚 Study</button>
+                    <button class="nav-tab mr-2 py-2 px-3 md:px-4 border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" data-tab="progress-tab">📊 Progress</button>
+                    <button class="nav-tab admin-tab content-admin-tab hidden mr-2 py-2 px-3 md:px-4 border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" data-tab="questions-tab">❓ Questions</button>
+                    <button class="nav-tab admin-tab hidden mr-2 py-2 px-3 md:px-4 border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" data-tab="users-tab">👥 Users</button>
+                    <button class="nav-tab admin-tab hidden mr-2 py-2 px-3 md:px-4 border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" data-tab="admin-dashboard">⚙️ Dashboard</button>
+                    <button class="nav-tab admin-only hidden mr-2 py-2 px-3 md:px-4 border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 whitespace-nowrap" data-tab="data-tab">💾 Data</button>
+                </nav>
+            </div>
+
+            <!-- Study Tab -->
+            <div id="study-tab" class="tab-container">
+                <!-- Study Controls -->
+                <div class="mb-6 space-y-4">
+                    <div class="flex flex-col md:flex-row gap-3 md:gap-4">
+                        <input type="text" id="study-search" class="flex-1 px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="🔍 Search questions...">
+                        <select id="study-topic-select" class="px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary">
+                            <option value="">All Topics</option>
+                        </select>
+                        <select id="study-difficulty-select" class="px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary">
+                            <option value="">All Difficulties</option>
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-col md:flex-row gap-3">
+                        <button id="start-study-session" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                            🎯 Start Study Session
+                        </button>
+                        <button id="end-study-session" class="hidden bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                            🏁 End Session
+                        </button>
+                        <button id="review-incorrect" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                            🔄 Review Incorrect
+                        </button>
+                        <button id="quick-quiz" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                            ⚡ Quick Quiz (5)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Study Session -->
+                <div id="study-session-active" class="hidden mb-6">
+                    <div class="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg mb-4">
+                        <div class="flex justify-between items-center">
+                            <h3 class="font-medium text-blue-700 dark:text-blue-300">📚 Study Session Active</h3>
+                            <div class="text-sm text-blue-600 dark:text-blue-400">
+                                ⏱️ Time: <span id="session-timer">00:00</span> | 
+                                📈 Progress: <span id="session-progress">0/0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Questions Container -->
+                <div id="questions-container" class="space-y-4"></div>
+            </div>
+
+            <!-- Progress Tab -->
+            <div id="progress-tab" class="tab-container hidden">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">📊 Your Study Progress</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Total Questions Attempted</div>
+                        <div id="total-attempted" class="text-3xl font-bold text-gray-900 dark:text-white mt-2">0</div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Correct Answers</div>
+                        <div id="total-correct" class="text-3xl font-bold text-green-500 mt-2">0</div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Best Streak</div>
+                        <div id="best-streak" class="text-3xl font-bold text-orange-500 mt-2">0</div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Study Time</div>
+                        <div id="study-time" class="text-3xl font-bold text-purple-500 mt-2">0h</div>
+                    </div>
+                </div>
+                
+                <!-- Topic Performance -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">📚 Performance by Topic</h4>
+                    <div id="topic-performance"></div>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">🕒 Recent Activity</h4>
+                    <div id="recent-activity"></div>
+                </div>
+            </div>
+
+            <!-- Questions Management Tab -->
+            <div id="questions-tab" class="tab-container hidden">
+                <div class="mb-6 flex flex-wrap gap-4">
+                    <button id="add-question-btn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        ➕ Add Question
+                    </button>
+                    <button id="add-questions-bulk-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        📝 Add Questions (JSON)
+                    </button>
+                    <div class="flex-1"></div>
+                    <input type="text" id="question-search" class="px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary max-w-xs" placeholder="🔍 Search questions...">
+                </div>
+                
+                <div id="question-form" class="hidden mb-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 id="question-form-title" class="text-lg font-bold text-gray-900 dark:text-white mb-4">➕ Add New Question</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="question-text" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Question Text</label>
+                            <textarea id="question-text" rows="3" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Enter the question"></textarea>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="question-topic" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Topic</label>
+                                <input type="text" id="question-topic" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Enter topic">
+                            </div>
+                            <div>
+                                <label for="question-difficulty" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Difficulty</label>
+                                <select id="question-difficulty" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary">
+                                    <option value="easy">Easy</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Options</label>
+                            <div id="question-options" class="space-y-3"></div>
+                            <button id="add-option-btn" class="mt-3 bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                ➕ Add Option
+                            </button>
+                        </div>
+                        <div>
+                            <label for="question-explanation" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Explanation</label>
+                            <textarea id="question-explanation" rows="2" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Add explanation for the correct answer (helps students learn!)"></textarea>
+                        </div>
+                        <div class="flex space-x-4">
+                            <button id="save-question-btn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                💾 Save Question
+                            </button>
+                            <button id="cancel-question-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Questions JSON Form -->
+                <div id="add-questions-json-form" class="hidden mb-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">📝 Add Questions from JSON</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="questions-json-input" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Paste JSON Array of Questions
+                            </label>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                Expected format: Array of objects with "question", "answers", "correct", and "mathDetail" fields
+                            </p>
+                            <textarea id="questions-json-input" rows="12" class="w-full px-4 py-3 text-base font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder='[
+  {
+    "question": "What is the primary role of Active Directory in Windows Server?",
+    "answers": ["To manage disk partitions", "To authenticate and authorize users and computers", "To run PowerShell scripts", "To schedule tasks"],
+    "correct": 1,
+    "mathDetail": "Active Directory handles identity management, allowing centralized login, authentication, and access control."
+  }
+]'></textarea>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="bulk-topic" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Default Topic</label>
+                                <input type="text" id="bulk-topic" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Enter topic for all questions" value="General">
+                            </div>
+                            <div>
+                                <label for="bulk-difficulty" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Default Difficulty</label>
+                                <select id="bulk-difficulty" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary">
+                                    <option value="easy">Easy</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="json-preview" class="hidden">
+                            <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview (first 3 questions):</h4>
+                            <div id="json-preview-content" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-sm max-h-40 overflow-y-auto"></div>
+                        </div>
+                        <div class="flex space-x-4">
+                            <button id="preview-questions-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                👁️ Preview Questions
+                            </button>
+                            <button id="save-questions-json-btn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                💾 Add All Questions
+                            </button>
+                            <button id="cancel-questions-json-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="questions-list" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"></div>
+                <div id="questions-pagination" class="flex justify-center mt-6 space-x-2"></div>
+            </div>
+
+            <!-- User Management Tab -->
+            <div id="users-tab" class="tab-container hidden">
+                <div class="mb-6 flex flex-wrap gap-4">
+                    <button id="add-user-btn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        👤 Add User
+                    </button>
+                    <div class="flex-1"></div>
+                    <input type="text" id="user-search" class="px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary max-w-xs" placeholder="🔍 Search users...">
+                    <select id="user-role-filter" class="px-4 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary">
+                        <option value="">All Roles</option>
+                        <option value="user">Student</option>
+                        <option value="content-admin">Teacher</option>
+                        <option value="admin">Administrator</option>
+                        <option value="super-admin">Super Admin</option>
+                    </select>
+                </div>
+                
+                <div id="user-form" class="hidden mb-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h3 id="user-form-title" class="text-lg font-bold text-gray-900 dark:text-white mb-4">👤 Add New User</h3>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="user-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
+                                <input type="text" id="user-name" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Enter full name">
+                            </div>
+                            <div>
+                                <label for="user-email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                                <input type="email" id="user-email" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder="Enter email">
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <label for="user-password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                            <input type="password" id="user-password" class="w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary pr-12" placeholder="Enter password">
+                            <button type="button" id="toggle-user-password" class="absolute right-3 top-9 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                👁️
+                            </button>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role</label>
+                            <div class="flex flex-wrap gap-2" id="user-role-selector">
+                                <button type="button" class="role-option px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 bg-primary text-white border-primary" data-role="user">Student</button>
+                                <button type="button" class="role-option px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300" data-role="content-admin">Teacher</button>
+                                <button type="button" class="role-option px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300" data-role="admin">Administrator</button>
+                                <button type="button" class="role-option hidden px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300" data-role="super-admin">Super Admin</button>
+                            </div>
+                            <input type="hidden" id="user-role" value="user">
+                        </div>
+                        <div class="flex space-x-4">
+                            <button id="save-user-btn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                💾 Save User
+                            </button>
+                            <button id="cancel-user-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="user-list" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"></div>
+                <div id="users-pagination" class="flex justify-center mt-6 space-x-2"></div>
+            </div>
+
+            <!-- Admin Dashboard Tab -->
+            <div id="admin-dashboard" class="tab-container hidden">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">⚙️ Admin Dashboard</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Total Users</div>
+                        <div id="total-users" class="text-3xl font-bold text-gray-900 dark:text-white mt-2">0</div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Total Questions</div>
+                        <div id="total-questions" class="text-3xl font-bold text-gray-900 dark:text-white mt-2">0</div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Active Today</div>
+                        <div id="active-today" class="text-3xl font-bold text-green-500 mt-2">0</div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">System Health</div>
+                        <div id="system-health" class="text-3xl font-bold text-green-500 mt-2">Good</div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Recent User Activity</h4>
+                        <div id="admin-recent-activity"></div>
+                    </div>
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                        <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Question Statistics</h4>
+                        <div id="question-stats">
+                            <p class="text-gray-700 dark:text-gray-300 mb-2">By Difficulty:</p>
+                            <ul id="difficulty-stats" class="text-gray-600 dark:text-gray-400"></ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h4>
+                    <div class="flex flex-wrap gap-4">
+                        <button id="backup-data-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                            💾 Backup Data
+                        </button>
+                        <button id="reset-test-data-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors">
+                            🔄 Reset Test Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Management Tab -->
+            <div id="data-tab" class="tab-container hidden">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-6">💾 Data Management</h3>
+                
+                <!-- Backup Section -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">🛡️ Data Backup & Security</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h5 class="font-medium text-gray-900 dark:text-white mb-2">Export Your Data</h5>
+                            <p class="text-gray-600 dark:text-gray-400 text-sm mb-4">Download all your progress, questions, and settings as a secure backup file.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="export-json-btn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                    📥 Export All Data
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <h5 class="font-medium text-gray-900 dark:text-white mb-2">Import Data</h5>
+                            <p class="text-gray-600 dark:text-gray-400 text-sm mb-4">Restore your data from a previous backup or import shared question sets.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="import-json-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                    📤 Import Data
+                                </button>
+                                <input type="file" id="file-import" accept=".json" class="hidden">
+                                <button id="file-import-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors">
+                                    📁 From File
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Import/Export Section -->
+                <div id="json-import-section" class="hidden mb-6 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg">
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">📤 Import Data</h4>
+                    <label for="json-editor" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Paste JSON data below:</label>
+                    <textarea id="json-editor" rows="10" class="w-full px-4 py-3 text-base font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" placeholder='Paste your JSON backup data here...'></textarea>
+                    <div class="mt-4 flex space-x-4">
+                        <button id="process-json-btn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition-colors">
+                            ✅ Import Data
+                        </button>
+                        <button id="cancel-json-btn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Data Statistics -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg mb-6">
+                    <h4 class="text-lg font-bold text-gray-900 dark:text-white mb-4">📈 Data Statistics</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center">
+                            <div id="data-size" class="text-2xl font-bold text-blue-500">0 KB</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Data Size</div>
+                        </div>
+                        <div class="text-center">
+                            <div id="last-backup-date" class="text-2xl font-bold text-green-500">Never</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Last Backup</div>
+                        </div>
+                        <div class="text-center">
+                            <div id="session-count" class="text-2xl font-bold text-purple-500">0</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Study Sessions</div>
+                        </div>
+                        <div class="text-center">
+                            <div id="storage-used" class="text-2xl font-bold text-orange-500">0%</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Storage Used</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Clear Data Section -->
+                <div class="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 p-6 rounded-xl">
+                    <h4 class="text-lg font-bold text-red-700 dark:text-red-300 mb-4">⚠️ Danger Zone</h4>
+                    <p class="text-red-600 dark:text-red-400 mb-4">These actions are permanent and cannot be undone. Make sure to backup your data first.</p>
+                    <div class="flex flex-wrap gap-4">
+                        <button id="clear-all-data-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors">
+                            💥 Clear All Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Enhanced security with password hashing
+        function hashPassword(password) {
+            return CryptoJS.SHA256(password + 'StudyMaster_Salt_2024').toString();
+        }
+
+        function verifyPassword(password, hash) {
+            return hashPassword(password) === hash;
+        }
+
+        // Dark mode detection and setup
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // Enhanced data structure with extensive questions
+        let users = JSON.parse(localStorage.getItem('studyMasterUsers')) || [
+            { 
+                id: 1, 
+                name: 'System Administrator', 
+                email: 'admin@studymaster.com', 
+                password: hashPassword('admin123'), 
+                role: 'super-admin',
+                createdAt: new Date().toISOString(),
+                lastLogin: null
+            },
+            { 
+                id: 2, 
+                name: 'Teacher', 
+                email: 'teacher@studymaster.com', 
+                password: hashPassword('teacher123'), 
+                role: 'content-admin',
+                createdAt: new Date().toISOString(),
+                lastLogin: null
+            },
+            { 
+                id: 3, 
+                name: 'Student', 
+                email: 'student@studymaster.com', 
+                password: hashPassword('student123'), 
+                role: 'user',
+                createdAt: new Date().toISOString(),
+                lastLogin: null
+            }
+        ];
+        
+        let questions = JSON.parse(localStorage.getItem('studyMasterQuestions')) || [
+            {
+                id: 1,
+                text: "What is the primary role of Active Directory in Windows Server?",
+                topic: "Windows Server",
+                difficulty: "medium",
+                options: [
+                    { id: 1, text: "To manage disk partitions", correct: false },
+                    { id: 2, text: "To authenticate and authorize users and computers", correct: true },
+                    { id: 3, text: "To run PowerShell scripts", correct: false },
+                    { id: 4, text: "To schedule tasks", correct: false }
+                ],
+                explanation: "Active Directory handles identity management, allowing centralized login, authentication, and access control.",
+                createdBy: 1,
+                createdAt: new Date().toISOString(),
+                lastUpdated: null
+            },
+            {
+                id: 2,
+                text: "Which Windows Server role allows sharing files and printers?",
+                topic: "Windows Server",
+                difficulty: "easy",
+                options: [
+                    { id: 1, text: "DNS Server", correct: false },
+                    { id: 2, text: "DHCP Server", correct: false },
+                    { id: 3, text: "File and Storage Services", correct: true },
+                    { id: 4, text: "Web Server (IIS)", correct: false }
+                ],
+                explanation: "File and Storage Services manage disk storage, folders, file sharing, and print services in a networked environment.",
+                createdBy: 2,
+                createdAt: new Date().toISOString(),
+                lastUpdated: null
+            },
+            {
+                id: 3,
+                text: "What protocol is primarily used for remote desktop access?",
+                topic: "Windows Server",
+                difficulty: "easy",
+                options: [
+                    { id: 1, text: "FTP", correct: false },
+                    { id: 2, text: "HTTP", correct: false },
+                    { id: 3, text: "RDP", correct: true },
+                    { id: 4, text: "SNMP", correct: false }
+                ],
+                explanation: "RDP (Remote Desktop Protocol) is the default protocol for remote access to Windows machines.",
+                createdBy: 1,
+                createdAt: new Date().toISOString(),
+                lastUpdated: null
+            }
+        ];
+        
+        let userProgress = JSON.parse(localStorage.getItem('studyMasterProgress')) || {};
+        let systemSettings = JSON.parse(localStorage.getItem('studyMasterSettings')) || {
+            maintenanceMode: false,
+            allowRegistrations: true,
+            lastBackup: null,
+            backupReminder: true,
+            sessionCount: 0
+        };
+        
+        // App state
+        let currentUser = null;
+        let isLoginMode = true;
+        let currentEditingQuestionId = null;
+        let currentEditingUserId = null;
+        let currentPage = {
+            study: 1,
+            questions: 1,
+            users: 1
+        };
+        const itemsPerPage = 5;
+        const maxQuestions = 100000; // Increased to 100,000 questions
+        
+        // Study session state
+        let currentStudySession = {
+            active: false,
+            activeQuestionId: null,
+            availableQuestions: [],
+            answeredQuestions: new Set(),
+            incorrectQuestions: new Set(),
+            currentStreak: 0,
+            bestStreak: 0,
+            sessionStats: {
+                totalAttempted: 0,
+                correctAnswers: 0,
+                startTime: null,
+                studyTime: 0
+            },
+            timer: null,
+            reviewMode: false,
+            quickQuizMode: false
+        };
+
+        // Enhanced notification system with better UX
+        function showToastNotification(message, type = 'success') {
+            const container = document.getElementById('notification-toast-container');
+            const toast = document.createElement('div');
+            toast.className = `notification-toast p-4 rounded-lg shadow-lg text-white max-w-sm transform transition-all duration-300 ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 
+                type === 'warning' ? 'bg-yellow-500' :
+                'bg-blue-500'
+            }`;
+            
+            const icons = {
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️',
+                'info': 'ℹ️'
+            };
+            
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-lg">${icons[type] || icons.info}</span>
+                        <span class="font-medium">${message}</span>
+                    </div>
+                    <button class="ml-4 text-white hover:text-gray-200" onclick="this.parentElement.parentElement.remove()">
+                        ×
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.style.transform = 'translateX(100%)';
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 300);
+                }
+            }, 5000);
+        }
+
+        // Enhanced modal system
+        function showConfirmDialog(message, onConfirm, onCancel = null, title = 'Confirm Action') {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 modal-backdrop flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-md w-full">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">${title}</h3>
+                    <p class="text-gray-700 dark:text-gray-300 mb-6">${message}</p>
+                    <div class="flex justify-end space-x-3">
+                        <button class="cancel-btn px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">Cancel</button>
+                        <button class="confirm-btn px-4 py-2 bg-red-500 text-white hover:bg-red-600 rounded-lg transition-colors">Confirm</button>
+                    </div>
+                </div>
+            `;
+            
+            modal.querySelector('.cancel-btn').addEventListener('click', () => {
+                modal.remove();
+                if (onCancel) onCancel();
+            });
+            
+            modal.querySelector('.confirm-btn').addEventListener('click', () => {
+                modal.remove();
+                onConfirm();
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                    if (onCancel) onCancel();
+                }
+            });
+            
+            document.getElementById('modal-container').appendChild(modal);
+        }
+
+        function showAlert(message, type = 'info', title = null) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 modal-backdrop flex items-center justify-center z-50 p-4';
+            const bgColor = type === 'error' ? 'bg-red-50 dark:bg-red-900' : 
+                           type === 'warning' ? 'bg-yellow-50 dark:bg-yellow-900' :
+                           type === 'success' ? 'bg-green-50 dark:bg-green-900' :
+                           'bg-blue-50 dark:bg-blue-900';
+            const textColor = type === 'error' ? 'text-red-700 dark:text-red-300' : 
+                             type === 'warning' ? 'text-yellow-700 dark:text-yellow-300' :
+                             type === 'success' ? 'text-green-700 dark:text-green-300' :
+                             'text-blue-700 dark:text-blue-300';
+            
+            const alertTitle = title || (type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : type === 'success' ? 'Success' : 'Information');
+            
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-md w-full">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">${alertTitle}</h3>
+                    <div class="${bgColor} p-4 rounded-lg mb-4">
+                        <p class="${textColor}">${message}</p>
+                    </div>
+                    <div class="flex justify-end">
+                        <button class="ok-btn px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            modal.querySelector('.ok-btn').addEventListener('click', () => {
+                modal.remove();
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+            
+            document.getElementById('modal-container').appendChild(modal);
+        }
+
+        function showPrompt(message, defaultValue = '', onConfirm, title = 'Input Required') {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 modal-backdrop flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-md w-full">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">${title}</h3>
+                    <p class="text-gray-700 dark:text-gray-300 mb-4">${message}</p>
+                    <input type="text" class="prompt-input w-full px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary mb-6" value="${defaultValue}">
+                    <div class="flex justify-end space-x-3">
+                        <button class="cancel-btn px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">Cancel</button>
+                        <button class="ok-btn px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors">OK</button>
+                    </div>
+                </div>
+            `;
+            
+            const input = modal.querySelector('.prompt-input');
+            
+            modal.querySelector('.cancel-btn').addEventListener('click', () => {
+                modal.remove();
+                onConfirm(null);
+            });
+            
+            modal.querySelector('.ok-btn').addEventListener('click', () => {
+                const value = input.value.trim();
+                modal.remove();
+                onConfirm(value);
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                    onConfirm(null);
+                }
+            });
+            
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const value = input.value.trim();
+                    modal.remove();
+                    onConfirm(value);
+                }
+            });
+            
+            document.getElementById('modal-container').appendChild(modal);
+            input.focus();
+            input.select();
+        }
+
+        // Enhanced explanation viewing feature
+        function showExplanationModal(question) {
+            if (!question.explanation) {
+                showAlert('No explanation available for this question.', 'info');
+                return;
+            }
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 modal-backdrop flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                    <div class="flex items-start justify-between mb-4">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white pr-4">💡 Question Explanation</h3>
+                        <button class="close-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xl">&times;</button>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <div class="explanation-card p-4 rounded-lg mb-4">
+                            <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                📚 ${question.topic} • ${question.difficulty}
+                            </div>
+                            <div class="font-medium text-gray-900 dark:text-white mb-3">${question.text}</div>
+                        </div>
+                        
+                        <div class="space-y-2 mb-4">
+                            ${question.options.map((opt, index) => {
+                                const letter = String.fromCharCode(65 + index);
+                                const bgClass = opt.correct ? 'answer-correct' : 'answer-option';
+                                const icon = opt.correct ? '✅' : '';
+                                
+                                return `
+                                    <div class="flex items-center p-3 rounded-lg ${bgClass}">
+                                        <span class="w-6 h-6 rounded-full border-2 border-current flex items-center justify-center mr-3 text-sm font-medium">${letter}</span>
+                                        <span class="flex-1">${opt.text}</span>
+                                        <span class="ml-2">${icon}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        
+                        <div class="explanation-card p-4 rounded-lg">
+                            <div class="flex items-start space-x-3">
+                                <span class="text-blue-500 text-xl flex-shrink-0">💡</span>
+                                <div>
+                                    <h4 class="font-semibold text-blue-700 dark:text-blue-300 mb-2">Explanation:</h4>
+                                    <p class="text-blue-600 dark:text-blue-400 leading-relaxed">${question.explanation}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end">
+                        <button class="close-btn bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg transition-colors">Got it!</button>
+                    </div>
+                </div>
+            `;
+            
+            const closeButtons = modal.querySelectorAll('.close-btn');
+            closeButtons.forEach(btn => {
+                btn.addEventListener('click', () => modal.remove());
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+            
+            document.getElementById('modal-container').appendChild(modal);
+        }
+
+        // Add Questions from JSON functionality
+        function showAddQuestionsForm() {
+            document.getElementById('add-questions-json-form').classList.remove('hidden');
+            document.getElementById('questions-json-input').focus();
+        }
+
+        function hideAddQuestionsForm() {
+            document.getElementById('add-questions-json-form').classList.add('hidden');
+            document.getElementById('json-preview').classList.add('hidden');
+        }
+
+        function previewQuestions() {
+            const jsonText = document.getElementById('questions-json-input').value.trim();
+            if (!jsonText) {
+                showAlert('Please enter JSON data first.', 'error');
+                return;
+            }
+
+            try {
+                const questionsData = JSON.parse(jsonText);
+                if (!Array.isArray(questionsData)) {
+                    showAlert('JSON must be an array of question objects.', 'error');
+                    return;
+                }
+
+                // Validate and preview first 3 questions
+                const preview = questionsData.slice(0, 3).map((q, index) => {
+                    if (!q.question || !q.answers || !Array.isArray(q.answers) || typeof q.correct !== 'number') {
+                        throw new Error(`Question ${index + 1}: Missing required fields (question, answers, correct)`);
+                    }
+                    if (q.correct < 0 || q.correct >= q.answers.length) {
+                        throw new Error(`Question ${index + 1}: Invalid correct answer index`);
+                    }
+                    return {
+                        question: q.question,
+                        answers: q.answers,
+                        correct: q.correct,
+                        explanation: q.mathDetail || q.explanation || ''
+                    };
+                });
+
+                // Show preview
+                const previewContainer = document.getElementById('json-preview');
+                const previewContent = document.getElementById('json-preview-content');
+                
+                previewContent.innerHTML = preview.map((q, index) => `
+                    <div class="mb-4 p-3 border-l-4 border-blue-500 bg-white dark:bg-gray-600 rounded">
+                        <div class="font-medium text-gray-900 dark:text-white mb-2">${index + 1}. ${q.question}</div>
+                        <div class="text-sm space-y-1">
+                            ${q.answers.map((answer, i) => `
+                                <div class="flex items-center ${i === q.correct ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-600 dark:text-gray-400'}">
+                                    <span class="mr-2">${String.fromCharCode(65 + i)}.</span>
+                                    <span>${answer}</span>
+                                    ${i === q.correct ? ' ✅' : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                        ${q.explanation ? `<div class="text-xs text-blue-600 dark:text-blue-400 mt-2">💡 ${q.explanation}</div>` : ''}
+                    </div>
+                `).join('');
+
+                previewContainer.classList.remove('hidden');
+                
+                showToastNotification(`Preview loaded! Found ${questionsData.length} questions.`, 'success');
+                
+            } catch (error) {
+                showAlert('Invalid JSON format: ' + error.message, 'error');
+            }
+        }
+
+        function saveQuestionsFromJson() {
+            const jsonText = document.getElementById('questions-json-input').value.trim();
+            const defaultTopic = document.getElementById('bulk-topic').value.trim() || 'General';
+            const defaultDifficulty = document.getElementById('bulk-difficulty').value;
+
+            if (!jsonText) {
+                showAlert('Please enter JSON data first.', 'error');
+                return;
+            }
+
+            try {
+                const questionsData = JSON.parse(jsonText);
+                if (!Array.isArray(questionsData)) {
+                    showAlert('JSON must be an array of question objects.', 'error');
+                    return;
+                }
+
+                let addedCount = 0;
+                let skippedCount = 0;
+
+                questionsData.forEach((q, index) => {
+                    // Validate required fields
+                    if (!q.question || !q.answers || !Array.isArray(q.answers) || typeof q.correct !== 'number') {
+                        console.warn(`Skipping question ${index + 1}: Missing required fields`);
+                        skippedCount++;
+                        return;
+                    }
+                    
+                    if (q.correct < 0 || q.correct >= q.answers.length) {
+                        console.warn(`Skipping question ${index + 1}: Invalid correct answer index`);
+                        skippedCount++;
+                        return;
+                    }
+
+                    // Check if we've reached the limit
+                    if (questions.length >= maxQuestions) {
+                        console.warn(`Skipping remaining questions: Maximum ${maxQuestions} questions reached`);
+                        skippedCount++;
+                        return;
+                    }
+
+                    // Convert to internal format
+                    const newQuestion = {
+                        id: questions.length > 0 ? Math.max(...questions.map(q => q.id)) + 1 : 1,
+                        text: q.question,
+                        topic: q.topic || defaultTopic,
+                        difficulty: q.difficulty || defaultDifficulty,
+                        options: q.answers.map((answer, i) => ({
+                            id: i + 1,
+                            text: answer,
+                            correct: i === q.correct
+                        })),
+                        explanation: q.mathDetail || q.explanation || null,
+                        createdBy: currentUser.id,
+                        createdAt: new Date().toISOString(),
+                        lastUpdated: null
+                    };
+
+                    questions.push(newQuestion);
+                    addedCount++;
+                });
+
+                if (addedCount > 0) {
+                    saveData();
+                    loadTopics(); // Refresh topics
+                    renderQuestionsList();
+                    hideAddQuestionsForm();
+                    
+                    let message = `Successfully added ${addedCount} questions!`;
+                    if (skippedCount > 0) {
+                        message += ` (${skippedCount} questions were skipped due to errors)`;
+                    }
+                    showToastNotification(message, 'success');
+                } else {
+                    showAlert('No valid questions found to add.', 'error');
+                }
+
+            } catch (error) {
+                showAlert('Invalid JSON format: ' + error.message, 'error');
+            }
+        }
+
+        // Enhanced backup system
+        function showBackupWarning() {
+            if (!currentUser || currentUser.isGuest || !['admin', 'super-admin'].includes(currentUser.role)) return;
+            
+            const warning = document.getElementById('backup-warning');
+            const lastBackup = systemSettings.lastBackup;
+            
+            if (!lastBackup || systemSettings.backupReminder) {
+                const daysSinceBackup = lastBackup ? 
+                    Math.floor((new Date() - new Date(lastBackup)) / (1000 * 60 * 60 * 24)) : 999;
+                
+                if (daysSinceBackup > 7) {
+                    warning.classList.remove('hidden');
+                }
+            }
+        }
+
+        function hideBackupWarning() {
+            document.getElementById('backup-warning').classList.add('hidden');
+        }
+
+        function updateBackupInfo() {
+            const lastBackupText = document.getElementById('last-backup-text');
+            const lastBackupDate = document.getElementById('last-backup-date');
+            
+            if (systemSettings.lastBackup) {
+                const backupDate = new Date(systemSettings.lastBackup);
+                const formatted = formatDate(systemSettings.lastBackup);
+                lastBackupText.textContent = `Last backup: ${formatted}`;
+                if (lastBackupDate) {
+                    lastBackupDate.textContent = backupDate.toLocaleDateString();
+                }
+            } else {
+                lastBackupText.textContent = 'Never backed up';
+                if (lastBackupDate) {
+                    lastBackupDate.textContent = 'Never';
+                }
+            }
+        }
+
+        // Forgot password functionality
+        function showForgotPassword() {
+            showPrompt('Enter your email address:', '', (email) => {
+                if (email) {
+                    const user = users.find(u => u.email === email);
+                    if (user) {
+                        // Generate temporary password
+                        const tempPassword = Math.random().toString(36).slice(-8);
+                        user.password = hashPassword(tempPassword);
+                        saveData();
+                        
+                        showAlert(`Your temporary password is: ${tempPassword}\nPlease change it after logging in.`, 'info', 'Password Reset');
+                    } else {
+                        showAlert('Email not found in system.', 'error');
+                    }
+                }
+            }, 'Password Reset');
+        }
+
+        // Study session functions with enhanced features
+        function startStudySession() {
+            const searchTerm = document.getElementById('study-search').value.toLowerCase();
+            const selectedTopic = document.getElementById('study-topic-select').value;
+            const selectedDifficulty = document.getElementById('study-difficulty-select').value;
+            
+            // Filter questions for session
+            let availableQuestions = questions.filter(question => {
+                const matchesSearch = question.text.toLowerCase().includes(searchTerm) || 
+                                     question.topic.toLowerCase().includes(searchTerm);
+                const matchesTopic = !selectedTopic || question.topic === selectedTopic;
+                const matchesDifficulty = !selectedDifficulty || question.difficulty === selectedDifficulty;
+                
+                return matchesSearch && matchesTopic && matchesDifficulty;
+            });
+
+            if (availableQuestions.length === 0) {
+                showAlert('No questions available for your current filters.', 'error');
+                return;
+            }
+
+            currentStudySession = {
+                active: true,
+                activeQuestionId: null,
+                availableQuestions: [...availableQuestions],
+                answeredQuestions: new Set(),
+                incorrectQuestions: new Set(),
+                currentStreak: 0,
+                bestStreak: 0,
+                sessionStats: {
+                    totalAttempted: 0,
+                    correctAnswers: 0,
+                    startTime: new Date(),
+                    studyTime: 0
+                },
+                timer: null,
+                reviewMode: false,
+                quickQuizMode: false
+            };
+
+            // Increment session count
+            systemSettings.sessionCount = (systemSettings.sessionCount || 0) + 1;
+            saveData();
+
+            startSessionUI();
+            showToastNotification('Study session started! Good luck! 🎯', 'success');
+        }
+
+        function startQuickQuiz() {
+            // Get 5 random questions
+            const shuffled = questions.sort(() => 0.5 - Math.random());
+            const selected = shuffled.slice(0, 5);
+
+            if (selected.length === 0) {
+                showAlert('No questions available for quick quiz.', 'error');
+                return;
+            }
+
+            currentStudySession = {
+                active: true,
+                activeQuestionId: null,
+                availableQuestions: selected,
+                answeredQuestions: new Set(),
+                incorrectQuestions: new Set(),
+                currentStreak: 0,
+                bestStreak: 0,
+                sessionStats: {
+                    totalAttempted: 0,
+                    correctAnswers: 0,
+                    startTime: new Date(),
+                    studyTime: 0
+                },
+                timer: null,
+                reviewMode: false,
+                quickQuizMode: true
+            };
+
+            systemSettings.sessionCount = (systemSettings.sessionCount || 0) + 1;
+            saveData();
+
+            startSessionUI();
+            showToastNotification('Quick Quiz started! ⚡', 'info');
+        }
+
+        function startSessionUI() {
+            // Update UI
+            document.getElementById('start-study-session').classList.add('hidden');
+            document.getElementById('end-study-session').classList.remove('hidden');
+            document.getElementById('study-session-active').classList.remove('hidden');
+
+            // Start timer
+            startSessionTimer();
+
+            // Show first question
+            showNextQuestion();
+
+            updateLiveStats();
+        }
+
+        function endStudySession() {
+            if (!currentStudySession.active) return;
+
+            clearInterval(currentStudySession.timer);
+            
+            // Calculate final study time
+            const endTime = new Date();
+            const sessionDuration = Math.floor((endTime - currentStudySession.sessionStats.startTime) / 1000);
+            currentStudySession.sessionStats.studyTime = sessionDuration;
+
+            // Update total study time for user
+            if (currentUser && userProgress[currentUser.id]) {
+                userProgress[currentUser.id].totalStudyTime = 
+                    (userProgress[currentUser.id].totalStudyTime || 0) + sessionDuration;
+            }
+            
+            // Show session summary
+            showSessionSummary();
+
+            // Reset session
+            currentStudySession = {
+                active: false,
+                activeQuestionId: null,
+                availableQuestions: [],
+                answeredQuestions: new Set(),
+                incorrectQuestions: new Set(),
+                currentStreak: 0,
+                bestStreak: 0,
+                sessionStats: {
+                    totalAttempted: 0,
+                    correctAnswers: 0,
+                    startTime: null,
+                    studyTime: 0
+                },
+                timer: null,
+                reviewMode: false,
+                quickQuizMode: false
+            };
+
+            // Update UI
+            document.getElementById('start-study-session').classList.remove('hidden');
+            document.getElementById('end-study-session').classList.add('hidden');
+            document.getElementById('study-session-active').classList.add('hidden');
+
+            // Clear questions container
+            document.getElementById('questions-container').innerHTML = '';
+
+            updateLiveStats();
+            saveData();
+            showToastNotification('Study session ended!', 'info');
+        }
+
+        function startReviewMode() {
+            if (!currentUser || !userProgress[currentUser.id]) {
+                showAlert('No incorrect answers to review yet.', 'error');
+                return;
+            }
+
+            const progress = userProgress[currentUser.id];
+            const incorrectQuestionIds = progress.recent
+                .filter(activity => !activity.isCorrect)
+                .map(activity => activity.questionId);
+
+            if (incorrectQuestionIds.length === 0) {
+                showAlert('No incorrect answers to review yet. Great job!', 'success');
+                return;
+            }
+
+            const reviewQuestions = questions.filter(q => incorrectQuestionIds.includes(q.id));
+
+            currentStudySession = {
+                active: true,
+                activeQuestionId: null,
+                availableQuestions: [...reviewQuestions],
+                answeredQuestions: new Set(),
+                incorrectQuestions: new Set(),
+                currentStreak: 0,
+                bestStreak: 0,
+                sessionStats: {
+                    totalAttempted: 0,
+                    correctAnswers: 0,
+                    startTime: new Date(),
+                    studyTime: 0
+                },
+                timer: null,
+                reviewMode: true,
+                quickQuizMode: false
+            };
+
+            systemSettings.sessionCount = (systemSettings.sessionCount || 0) + 1;
+            saveData();
+
+            startSessionUI();
+            showToastNotification('Review mode started! 📚', 'info');
+        }
+
+        function startSessionTimer() {
+            let seconds = 0;
+            currentStudySession.timer = setInterval(() => {
+                seconds++;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                document.getElementById('session-timer').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function showNextQuestion() {
+            // Get next question
+            const nextQuestion = getNextQuestion();
+            
+            if (!nextQuestion) {
+                // No more questions, end session
+                endStudySession();
+                return;
+            }
+
+            currentStudySession.activeQuestionId = nextQuestion.id;
+            updateSessionProgress();
+            renderSingleQuestion(nextQuestion);
+        }
+
+        function getNextQuestion() {
+            // First priority: questions that were answered incorrectly and need retry
+            const retryQuestions = currentStudySession.availableQuestions.filter(q => 
+                currentStudySession.incorrectQuestions.has(q.id) && 
+                !currentStudySession.answeredQuestions.has(q.id)
+            );
+
+            if (retryQuestions.length > 0) {
+                return retryQuestions[0]; // Return first retry question
+            }
+
+            // Second priority: unanswered questions
+            const unansweredQuestions = currentStudySession.availableQuestions.filter(q => 
+                !currentStudySession.answeredQuestions.has(q.id)
+            );
+
+            if (unansweredQuestions.length > 0) {
+                // Randomize selection unless in quick quiz mode
+                if (currentStudySession.quickQuizMode) {
+                    return unansweredQuestions[0];
+                }
+                return unansweredQuestions[Math.floor(Math.random() * unansweredQuestions.length)];
+            }
+
+            return null; // No more questions
+        }
+
+        function renderSingleQuestion(question) {
+            const questionsContainer = document.getElementById('questions-container');
+            questionsContainer.innerHTML = ''; // Clear previous questions
+
+            const questionEl = document.createElement('div');
+            questionEl.className = 'question-card p-6 rounded-xl shadow-lg question-transition border-l-4 border-primary';
+            questionEl.dataset.questionId = question.id;
+            
+            const difficultyColor = question.difficulty === 'easy' ? 'text-green-500' : 
+                                  question.difficulty === 'medium' ? 'text-yellow-500' : 'text-red-500';
+            
+            const difficultyEmoji = question.difficulty === 'easy' ? '🟢' : 
+                                   question.difficulty === 'medium' ? '🟡' : '🔴';
+            
+            let optionsHtml = question.options.map(opt => {
+                return `<button class="option answer-option w-full text-left p-4 rounded-lg transition-all text-responsive flex items-center" data-option-id="${opt.id}">
+                    <span class="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center mr-3 text-sm font-medium">${String.fromCharCode(65 + question.options.indexOf(opt))}</span>
+                    <span class="text-gray-900 dark:text-white">${opt.text}</span>
+                </button>`;
+            }).join('');
+            
+            questionEl.innerHTML = `
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Question ${currentStudySession.sessionStats.totalAttempted + 1}</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">📚 ${question.topic}</span>
+                            <span class="text-sm ${difficultyColor} font-medium">${difficultyEmoji} ${question.difficulty}</span>
+                            ${question.explanation ? '<button class="view-explanation text-sm text-blue-500 hover:text-blue-600 font-medium">💡 View Explanation</button>' : ''}
+                        </div>
+                    </div>
+                    <h3 class="text-xl md:text-2xl font-medium text-gray-900 dark:text-white leading-relaxed">${question.text}</h3>
+                </div>
+                <div class="space-y-3 mb-6">${optionsHtml}</div>
+                <div class="text-center">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        💡 Choose the best answer above
+                    </div>
+                </div>
+            `;
+            
+            questionsContainer.appendChild(questionEl);
+
+            // Add event listeners to options
+            questionEl.querySelectorAll('.option').forEach(option => {
+                option.addEventListener('click', handleSessionAnswerSelection);
+            });
+
+            // Add explanation button listener
+            const explanationBtn = questionEl.querySelector('.view-explanation');
+            if (explanationBtn) {
+                explanationBtn.addEventListener('click', () => {
+                    showExplanationModal(question);
+                });
+            }
+        }
+
+        function handleSessionAnswerSelection(e) {
+            if (!currentUser || !currentStudySession.active) return;
+            
+            const optionEl = e.target.closest('.option');
+            const questionEl = optionEl.closest('.question-card');
+            const questionId = parseInt(questionEl.dataset.questionId);
+            const optionId = parseInt(optionEl.dataset.optionId);
+            
+            const question = questions.find(q => q.id === questionId);
+            const selectedOption = question.options.find(opt => opt.id === optionId);
+            const isCorrect = selectedOption.correct;
+            
+            // Update session stats
+            currentStudySession.sessionStats.totalAttempted++;
+            if (isCorrect) {
+                currentStudySession.sessionStats.correctAnswers++;
+                currentStudySession.currentStreak++;
+                if (currentStudySession.currentStreak > currentStudySession.bestStreak) {
+                    currentStudySession.bestStreak = currentStudySession.currentStreak;
+                }
+                // Mark as answered correctly
+                currentStudySession.answeredQuestions.add(questionId);
+                currentStudySession.incorrectQuestions.delete(questionId);
+                showToastNotification('Correct! Well done! ✓', 'success');
+            } else {
+                currentStudySession.currentStreak = 0;
+                // Mark for retry
+                currentStudySession.incorrectQuestions.add(questionId);
+                showToastNotification('Incorrect. You\'ll get another chance!', 'error');
+            }
+
+            // Update UI immediately with enhanced styling
+            questionEl.querySelectorAll('.option').forEach(opt => {
+                opt.classList.remove('answer-correct', 'answer-incorrect');
+                const optId = parseInt(opt.dataset.optionId);
+                const thisOption = question.options.find(o => o.id === optId);
+                
+                if (thisOption.correct) {
+                    opt.classList.add('answer-correct');
+                    opt.querySelector('span').textContent = '✓';
+                } else if (optId === optionId) {
+                    opt.classList.add('answer-incorrect');
+                    opt.querySelector('span').textContent = '✗';
+                }
+                
+                opt.disabled = true;
+                opt.classList.add('cursor-not-allowed');
+            });
+            
+            // Show explanation if available
+            if (question.explanation) {
+                const explanationEl = document.createElement('div');
+                explanationEl.className = 'mt-6 explanation-card p-4 rounded-lg';
+                explanationEl.innerHTML = `
+                    <div class="flex items-start space-x-2">
+                        <span class="text-blue-500 text-lg">💡</span>
+                        <div>
+                            <strong class="text-blue-700 dark:text-blue-300">Explanation:</strong>
+                            <p class="text-blue-600 dark:text-blue-400 mt-1">${question.explanation}</p>
+                        </div>
+                    </div>
+                `;
+                questionEl.appendChild(explanationEl);
+            }
+
+            // Update global progress
+            updateUserProgress(questionId, question, isCorrect);
+
+            // Update live statistics
+            updateLiveStats();
+            updateSessionProgress();
+
+            // Show next question after delay
+            setTimeout(() => {
+                showNextQuestion();
+            }, 3000);
+        }
+
+        function updateUserProgress(questionId, question, isCorrect) {
+            if (!userProgress[currentUser.id]) {
+                userProgress[currentUser.id] = {
+                    attempted: 0,
+                    correct: 0,
+                    bestStreak: 0,
+                    totalStudyTime: 0,
+                    byTopic: {},
+                    recent: []
+                };
+            }
+            
+            userProgress[currentUser.id].attempted++;
+            if (isCorrect) {
+                userProgress[currentUser.id].correct++;
+            }
+
+            // Update best streak
+            if (currentStudySession.bestStreak > userProgress[currentUser.id].bestStreak) {
+                userProgress[currentUser.id].bestStreak = currentStudySession.bestStreak;
+            }
+            
+            // Track by topic
+            if (!userProgress[currentUser.id].byTopic[question.topic]) {
+                userProgress[currentUser.id].byTopic[question.topic] = {
+                    attempted: 0,
+                    correct: 0
+                };
+            }
+            
+            userProgress[currentUser.id].byTopic[question.topic].attempted++;
+            if (isCorrect) {
+                userProgress[currentUser.id].byTopic[question.topic].correct++;
+            }
+            
+            // Add to recent activity
+            userProgress[currentUser.id].recent.unshift({
+                questionId,
+                questionText: question.text,
+                topic: question.topic,
+                isCorrect,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Keep only last 20 activities
+            if (userProgress[currentUser.id].recent.length > 20) {
+                userProgress[currentUser.id].recent = userProgress[currentUser.id].recent.slice(0, 20);
+            }
+            
+            saveData();
+        }
+
+        function updateLiveStats() {
+            if (!currentUser) return;
+
+            const progress = userProgress[currentUser.id] || { attempted: 0, correct: 0, bestStreak: 0 };
+
+            // Animate counter updates
+            animateCounter('live-attempted', progress.attempted);
+            animateCounter('live-correct', progress.correct);
+            animateCounter('live-streak', currentStudySession.currentStreak);
+            
+            const accuracy = progress.attempted > 0 ? Math.round((progress.correct / progress.attempted) * 100) : 0;
+            document.getElementById('live-accuracy').textContent = `${accuracy}%`;
+        }
+
+        function animateCounter(elementId, newValue) {
+            const element = document.getElementById(elementId);
+            const currentValue = parseInt(element.textContent) || 0;
+            
+            if (currentValue !== newValue) {
+                element.classList.add('counter-animation');
+                element.textContent = newValue;
+                
+                setTimeout(() => {
+                    element.classList.remove('counter-animation');
+                }, 800);
+            }
+        }
+
+        function updateSessionProgress() {
+            const totalQuestions = currentStudySession.availableQuestions.length;
+            const answeredQuestions = currentStudySession.answeredQuestions.size;
+            document.getElementById('session-progress').textContent = `${answeredQuestions}/${totalQuestions}`;
+        }
+
+        function showSessionSummary() {
+            const session = currentStudySession.sessionStats;
+            const duration = Math.floor((new Date() - session.startTime) / 1000);
+            const minutes = Math.floor(duration / 60);
+            const seconds = duration % 60;
+            const accuracy = session.totalAttempted > 0 ? Math.round((session.correctAnswers / session.totalAttempted) * 100) : 0;
+
+            const performanceEmoji = accuracy >= 90 ? '🏆' : accuracy >= 70 ? '🎉' : accuracy >= 50 ? '👍' : '💪';
+            const performanceText = accuracy >= 90 ? 'Excellent!' : accuracy >= 70 ? 'Great Job!' : accuracy >= 50 ? 'Good Work!' : 'Keep Practicing!';
+
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 modal-backdrop flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl max-w-md w-full">
+                    <div class="text-center mb-6">
+                        <div class="text-6xl mb-2">${performanceEmoji}</div>
+                        <h3 class="text-2xl font-bold text-gray-900 dark:text-white">${performanceText}</h3>
+                        <p class="text-gray-600 dark:text-gray-400">${currentStudySession.quickQuizMode ? 'Quick Quiz' : currentStudySession.reviewMode ? 'Review Session' : 'Study Session'} Complete</p>
+                    </div>
+                    <div class="space-y-4 mb-6">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 dark:text-gray-400">Questions Attempted:</span>
+                            <span class="font-semibold text-gray-900 dark:text-white">${session.totalAttempted}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 dark:text-gray-400">Correct Answers:</span>
+                            <span class="font-semibold text-green-500">${session.correctAnswers}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 dark:text-gray-400">Accuracy:</span>
+                            <span class="font-semibold text-blue-500">${accuracy}%</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 dark:text-gray-400">Best Streak:</span>
+                            <span class="font-semibold text-orange-500">${currentStudySession.bestStreak}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600 dark:text-gray-400">Time Spent:</span>
+                            <span class="font-semibold text-purple-500">${minutes}m ${seconds}s</span>
+                        </div>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button class="close-summary flex-1 bg-primary hover:bg-primary-dark text-white py-3 rounded-lg font-medium transition-colors">Continue Studying</button>
+                        <button class="view-progress bg-gray-500 hover:bg-gray-600 text-white py-3 px-4 rounded-lg font-medium transition-colors">📊</button>
+                    </div>
+                </div>
+            `;
+
+            modal.querySelector('.close-summary').addEventListener('click', () => {
+                modal.remove();
+            });
+
+            modal.querySelector('.view-progress').addEventListener('click', () => {
+                modal.remove();
+                switchTab('progress-tab');
+            });
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+
+            document.getElementById('modal-container').appendChild(modal);
+        }
+
+        // Enhanced data management and backup system
+        function exportToJson(progressOnly = false) {
+            let data;
+            
+            if (progressOnly && currentUser) {
+                data = {
+                    userProgress: { [currentUser.id]: userProgress[currentUser.id] },
+                    user: currentUser,
+                    exportType: 'progress',
+                    exportDate: new Date().toISOString()
+                };
+            } else {
+                data = {
+                    questions,
+                    users,
+                    userProgress,
+                    systemSettings,
+                    exportType: 'full',
+                    exportDate: new Date().toISOString()
+                };
+            }
+            
+            const jsonStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `studymaster-${progressOnly ? 'progress' : 'data'}-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Update backup timestamp
+            systemSettings.lastBackup = new Date().toISOString();
+            saveData();
+            updateBackupInfo();
+            hideBackupWarning();
+            
+            showToastNotification(`${progressOnly ? 'Progress' : 'Data'} exported successfully! 📥`, 'success');
+        }
+
+        function importFromJson() {
+            try {
+                const data = JSON.parse(document.getElementById('json-editor').value);
+                
+                if (data.exportType === 'progress' && currentUser) {
+                    // Import progress only
+                    if (data.userProgress && data.userProgress[currentUser.id]) {
+                        userProgress[currentUser.id] = data.userProgress[currentUser.id];
+                        showToastNotification('Progress imported successfully! 📤', 'success');
+                    } else {
+                        showAlert('No progress data found for current user.', 'warning');
+                    }
+                } else {
+                    // Import full data
+                    if (data.questions && Array.isArray(data.questions)) {
+                        questions = data.questions;
+                    }
+                    
+                    if (data.users && Array.isArray(data.users)) {
+                        users = data.users;
+                    }
+                    
+                    if (data.userProgress && typeof data.userProgress === 'object') {
+                        userProgress = data.userProgress;
+                    }
+                    
+                    if (data.systemSettings && typeof data.systemSettings === 'object') {
+                        systemSettings = { ...systemSettings, ...data.systemSettings };
+                    }
+                    
+                    showToastNotification('Data imported successfully! 📤', 'success');
+                }
+                
+                saveData();
+                hideJsonImport();
+                renderQuestionsList();
+                renderUserList();
+                loadTopics();
+                updateBackupInfo();
+                
+            } catch (e) {
+                showAlert('Invalid JSON format: ' + e.message, 'error');
+            }
+        }
+
+        function importFromFile() {
+            const fileInput = document.getElementById('file-import');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showAlert('Please select a file to import.', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    document.getElementById('json-editor').value = JSON.stringify(data, null, 2);
+                    document.getElementById('json-import-section').classList.remove('hidden');
+                    showToastNotification('File loaded! Review and click Import Data.', 'info');
+                } catch (error) {
+                    showAlert('Invalid file format: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllData() {
+            showConfirmDialog(
+                'WARNING: This will permanently delete ALL data including users, questions, and progress. This action cannot be undone!',
+                () => {
+                    localStorage.removeItem('studyMasterUsers');
+                    localStorage.removeItem('studyMasterQuestions');
+                    localStorage.removeItem('studyMasterProgress');
+                    localStorage.removeItem('studyMasterSettings');
+                    
+                    showToastNotification('All data cleared! Reloading...', 'success');
+                    
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                },
+                null,
+                'Clear All Data'
+            );
+        }
+
+        function updateDataStatistics() {
+            // Calculate data size
+            const dataSize = new Blob([JSON.stringify({
+                questions, users, userProgress, systemSettings
+            })]).size;
+            
+            document.getElementById('data-size').textContent = `${Math.round(dataSize / 1024)}KB`;
+            
+            // Session count
+            document.getElementById('session-count').textContent = systemSettings.sessionCount || 0;
+            
+            // Storage usage (rough estimate for localStorage limit ~5MB)
+            const storagePercent = Math.min(Math.round((dataSize / (5 * 1024 * 1024)) * 100), 100);
+            document.getElementById('storage-used').textContent = `${storagePercent}%`;
+        }
+
+        // Initialize the app
+        function init() {
+            loadTopics();
+            setupEventListeners();
+            updateBackupInfo();
+            checkAuth();
+            
+            // Show backup warning on initial load for admins
+            setTimeout(() => {
+                if (currentUser && ['admin', 'super-admin'].includes(currentUser.role)) {
+                    showBackupWarning();
+                }
+            }, 3000);
+        }
+        
+        // Enhanced event listeners setup
+        function setupEventListeners() {
+            // Landing page
+            document.getElementById('try-guest-mode').addEventListener('click', startGuestMode);
+            document.getElementById('go-to-login').addEventListener('click', showAuthSection);
+            document.getElementById('back-to-landing').addEventListener('click', showLandingSection);
+            
+            // Authentication
+            document.getElementById('auth-toggle').addEventListener('click', toggleAuthMode);
+            document.getElementById('auth-submit').addEventListener('click', handleAuth);
+            document.getElementById('logout-btn').addEventListener('click', logout);
+            document.getElementById('forgot-password-btn').addEventListener('click', showForgotPassword);
+            
+            // Password toggles
+            document.getElementById('toggle-login-password').addEventListener('click', () => togglePasswordVisibility('auth-password', document.getElementById('toggle-login-password')));
+            document.getElementById('toggle-register-password').addEventListener('click', () => togglePasswordVisibility('auth-register-password', document.getElementById('toggle-register-password')));
+            document.getElementById('toggle-user-password').addEventListener('click', () => togglePasswordVisibility('user-password', document.getElementById('toggle-user-password')));
+            
+            // Role selection
+            document.querySelectorAll('.role-option').forEach(option => {
+                option.addEventListener('click', (e) => {
+                    const role = e.target.getAttribute('data-role');
+                    selectRole(role, e.target.closest('.role-option').parentElement);
+                });
+            });
+            
+            // Backup warning
+            document.getElementById('backup-now-btn').addEventListener('click', () => {
+                exportToJson();
+                hideBackupWarning();
+            });
+            document.getElementById('dismiss-warning-btn').addEventListener('click', hideBackupWarning);
+            document.getElementById('data-backup-btn').addEventListener('click', () => exportToJson());
+            
+            // Tab navigation
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    switchTab(tabId);
+                });
+            });
+            
+            // Study session controls
+            document.getElementById('start-study-session').addEventListener('click', startStudySession);
+            document.getElementById('end-study-session').addEventListener('click', endStudySession);
+            document.getElementById('review-incorrect').addEventListener('click', startReviewMode);
+            document.getElementById('quick-quiz').addEventListener('click', startQuickQuiz);
+            
+            // Study section
+            document.getElementById('study-search').addEventListener('input', () => {
+                if (!currentStudySession.active) {
+                    currentPage.study = 1;
+                    renderQuestions();
+                }
+            });
+            document.getElementById('study-topic-select').addEventListener('change', () => {
+                if (!currentStudySession.active) {
+                    currentPage.study = 1;
+                    renderQuestions();
+                }
+            });
+            document.getElementById('study-difficulty-select').addEventListener('change', () => {
+                if (!currentStudySession.active) {
+                    currentPage.study = 1;
+                    renderQuestions();
+                }
+            });
+            
+            // Question management
+            document.getElementById('add-question-btn').addEventListener('click', showQuestionForm);
+            document.getElementById('cancel-question-btn').addEventListener('click', hideQuestionForm);
+            document.getElementById('save-question-btn').addEventListener('click', saveQuestion);
+            document.getElementById('add-option-btn').addEventListener('click', addOption);
+            document.getElementById('question-search').addEventListener('input', () => {
+                currentPage.questions = 1;
+                renderQuestionsList();
+            });
+            document.getElementById('add-questions-bulk-btn').addEventListener('click', showAddQuestionsForm);
+            
+            // Add questions JSON form
+            document.getElementById('preview-questions-btn').addEventListener('click', previewQuestions);
+            document.getElementById('save-questions-json-btn').addEventListener('click', saveQuestionsFromJson);
+            document.getElementById('cancel-questions-json-btn').addEventListener('click', hideAddQuestionsForm);
+            
+            // User management
+            document.getElementById('add-user-btn').addEventListener('click', showUserForm);
+            document.getElementById('cancel-user-btn').addEventListener('click', hideUserForm);
+            document.getElementById('save-user-btn').addEventListener('click', saveUser);
+            document.getElementById('user-search').addEventListener('input', () => {
+                currentPage.users = 1;
+                renderUserList();
+            });
+            document.getElementById('user-role-filter').addEventListener('change', () => {
+                currentPage.users = 1;
+                renderUserList();
+            });
+            
+            // Admin dashboard
+            document.getElementById('backup-data-btn').addEventListener('click', () => exportToJson());
+            document.getElementById('reset-test-data-btn').addEventListener('click', resetTestData);
+
+            // Data management
+            document.getElementById('export-json-btn').addEventListener('click', () => exportToJson());
+            document.getElementById('import-json-btn').addEventListener('click', showJsonImport);
+            document.getElementById('file-import-btn').addEventListener('click', () => document.getElementById('file-import').click());
+            document.getElementById('file-import').addEventListener('change', importFromFile);
+            document.getElementById('process-json-btn').addEventListener('click', importFromJson);
+            document.getElementById('cancel-json-btn').addEventListener('click', hideJsonImport);
+            document.getElementById('clear-all-data-btn').addEventListener('click', clearAllData);
+        }
+
+        // Enhanced authentication with guest mode
+        function startGuestMode() {
+            currentUser = {
+                id: 'guest',
+                name: 'Guest User',
+                email: 'guest@example.com',
+                role: 'user',
+                isGuest: true
+            };
+            
+            showToastNotification('Welcome to Guest Mode! 🎯', 'info');
+            checkAuth();
+        }
+
+        function showAuthSection() {
+            document.getElementById('landing-section').classList.add('hidden');
+            document.getElementById('auth-section').classList.remove('hidden');
+        }
+
+        function showLandingSection() {
+            document.getElementById('landing-section').classList.remove('hidden');
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-section').classList.add('hidden');
+        }
+        
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId, toggleElement) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                toggleElement.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                toggleElement.textContent = '👁️';
+            }
+        }
+        
+        // Authentication functions with improved security
+        function toggleAuthMode() {
+            isLoginMode = !isLoginMode;
+            const authTitle = document.getElementById('auth-title');
+            const authSubmit = document.getElementById('auth-submit');
+            const authToggle = document.getElementById('auth-toggle');
+            const registerFields = document.getElementById('register-fields');
+            const authError = document.getElementById('auth-error');
+            
+            if (isLoginMode) {
+                authTitle.textContent = 'Login';
+                authSubmit.textContent = 'Login';
+                authToggle.textContent = 'Switch to Register';
+                registerFields.classList.add('hidden');
+            } else {
+                authTitle.textContent = 'Register';
+                authSubmit.textContent = 'Register';
+                authToggle.textContent = 'Switch to Login';
+                registerFields.classList.remove('hidden');
+            }
+            
+            authError.textContent = '';
+            authError.classList.add('hidden');
+        }
+        
+        function selectRole(role, container) {
+            container.querySelectorAll('.role-option').forEach(option => {
+                option.classList.remove('bg-primary', 'text-white', 'border-primary');
+                option.classList.add('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300');
+            });
+            
+            const selectedOption = container.querySelector(`.role-option[data-role="${role}"]`);
+            if (selectedOption) {
+                selectedOption.classList.add('bg-primary', 'text-white', 'border-primary');
+                selectedOption.classList.remove('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300');
+                container.nextElementSibling.value = role;
+            }
+        }
+        
+        function handleAuth() {
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+            
+            if (isLoginMode) {
+                login(email, password);
+            } else {
+                const name = document.getElementById('auth-name').value.trim();
+                const registerPassword = document.getElementById('auth-register-password').value;
+                const confirmPassword = document.getElementById('auth-confirm-password').value;
+                const role = document.getElementById('auth-role').value;
+                
+                if (!name || !email || !registerPassword || !confirmPassword) {
+                    showAuthError('Please fill in all fields');
+                    return;
+                }
+                
+                if (registerPassword !== confirmPassword) {
+                    showAuthError('Passwords do not match');
+                    return;
+                }
+                
+                if (registerPassword.length < 6) {
+                    showAuthError('Password must be at least 6 characters long');
+                    return;
+                }
+                
+                register(email, registerPassword, name, role);
+            }
+        }
+
+        function showAuthError(message) {
+            const authError = document.getElementById('auth-error');
+            authError.textContent = message;
+            authError.classList.remove('hidden');
+        }
+        
+        function login(email, password) {
+            const user = users.find(u => u.email === email && verifyPassword(password, u.password));
+            
+            if (user) {
+                // Update last login
+                user.lastLogin = new Date().toISOString();
+                currentUser = user;
+                saveData();
+                checkAuth();
+                showToastNotification(`Welcome back, ${user.name}! 👋`, 'success');
+            } else {
+                showAuthError('Invalid email or password');
+            }
+        }
+        
+        function register(email, password, name, role) {
+            if (users.some(u => u.email === email)) {
+                showAuthError('Email already registered');
+                return;
+            }
+            
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAuthError('Please enter a valid email address');
+                return;
+            }
+            
+            const newUser = {
+                id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1,
+                name,
+                email,
+                password: hashPassword(password),
+                role,
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+            };
+            
+            users.push(newUser);
+            currentUser = newUser;
+            saveData();
+            checkAuth();
+            showToastNotification('Registration successful! Welcome to StudyMaster! 🎉', 'success');
+        }
+        
+        function logout() {
+            const userName = currentUser ? currentUser.name : 'User';
+            currentUser = null;
+            endStudySession(); // End any active session
+            resetAuthForm();
+            showLandingSection();
+            showToastNotification(`Goodbye, ${userName}! 👋`, 'info');
+        }
+        
+        function resetAuthForm() {
+            document.getElementById('auth-email').value = '';
+            document.getElementById('auth-password').value = '';
+            document.getElementById('auth-name').value = '';
+            document.getElementById('auth-register-password').value = '';
+            document.getElementById('auth-confirm-password').value = '';
+            document.getElementById('auth-role').value = 'user';
+            isLoginMode = true;
+            toggleAuthMode();
+        }
+        
+        // Check authentication state with enhanced UI
+        function checkAuth() {
+            const landingSection = document.getElementById('landing-section');
+            const authSection = document.getElementById('auth-section');
+            const appSection = document.getElementById('app-section');
+            const headerActions = document.getElementById('header-actions');
+            const welcomeMessage = document.getElementById('welcome-message');
+            const userRoleBadge = document.getElementById('user-role-badge');
+            
+            if (currentUser) {
+                landingSection.classList.add('hidden');
+                authSection.classList.add('hidden');
+                appSection.classList.remove('hidden');
+                headerActions.classList.remove('hidden');
+          
+                const greeting = getGreeting();
+                welcomeMessage.textContent = `${greeting}, ${currentUser.name}!`;
+                
+                // Set up user role badge
+                let badgeClass = '';
+                let roleText = '';
+                const roleIcon = currentUser.isGuest ? '👤' : 
+                               currentUser.role === 'super-admin' ? '👑' :
+                               currentUser.role === 'admin' ? '⚙️' :
+                               currentUser.role === 'content-admin' ? '📚' : '🎓';
+                
+                switch(currentUser.role) {
+                    case 'super-admin':
+                        badgeClass = 'bg-gradient-to-r from-orange-500 to-red-500 text-white';
+                        roleText = 'Super Admin';
+                        break;
+                    case 'admin':
+                        badgeClass = 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
+                        roleText = 'Administrator';
+                        break;
+                    case 'content-admin':
+                        badgeClass = 'bg-gradient-to-r from-teal-500 to-blue-500 text-white';
+                        roleText = 'Teacher';
+                        break;
+                    default:
+                        badgeClass = 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
+                        roleText = currentUser.isGuest ? 'Guest' : 'Student';
+                }
+                
+                userRoleBadge.innerHTML = `<span class="inline-flex items-center space-x-1 px-3 py-1 rounded-full text-sm font-medium ${badgeClass}"><span>${roleIcon}</span><span>${roleText}</span></span>`;
+                
+                // Show/hide admin tabs and features based on role
+                document.querySelectorAll('.admin-tab').forEach(tab => {
+                    tab.classList.add('hidden');
+                });
+                
+                document.querySelectorAll('.admin-only').forEach(element => {
+                    element.classList.add('hidden');
+                });
+                
+                if (currentUser.role === 'content-admin' && !currentUser.isGuest) {
+                    document.querySelectorAll('.content-admin-tab').forEach(tab => {
+                        tab.classList.remove('hidden');
+                    });
+                }
+                
+                if (['admin', 'super-admin'].includes(currentUser.role) && !currentUser.isGuest) {
+                    document.querySelectorAll('.admin-tab').forEach(tab => {
+                        tab.classList.remove('hidden');
+                    });
+                    document.querySelectorAll('.admin-only').forEach(element => {
+                        element.classList.remove('hidden');
+                    });
+                }
+                
+                // Initialize the app sections
+                updateLiveStats();
+                renderQuestions();
+                renderProgress();
+                
+                if (!currentUser.isGuest) {
+                    renderQuestionsList();
+                    renderUserList();
+                    renderAdminDashboard();
+                    updateDataStatistics();
+                }
+            } else {
+                landingSection.classList.remove('hidden');
+                authSection.classList.add('hidden');
+                appSection.classList.add('hidden');
+                headerActions.classList.add('hidden');
+            }
+        }
+
+        function getGreeting() {
+            const hour = new Date().getHours();
+            if (hour < 12) return 'Good morning';
+            if (hour < 17) return 'Good afternoon';
+            return 'Good evening';
+        }
+        
+        // Tab navigation with improved UX
+        function switchTab(tabId) {
+            // Update active tab
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active', 'border-primary', 'text-primary');
+                tab.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                if (tab.getAttribute('data-tab') === tabId) {
+                    tab.classList.add('active', 'border-primary', 'text-primary');
+                    tab.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                }
+            });
+            
+            // Show active container
+            document.querySelectorAll('.tab-container').forEach(container => {
+                container.classList.add('hidden');
+                if (container.id === tabId) {
+                    container.classList.remove('hidden');
+                }
+            });
+            
+            // Refresh data if needed
+            if (tabId === 'study-tab') {
+                renderQuestions();
+            } else if (tabId === 'progress-tab') {
+                renderProgress();
+            } else if (tabId === 'questions-tab') {
+                renderQuestionsList();
+            } else if (tabId === 'users-tab') {
+                renderUserList();
+            } else if (tabId === 'admin-dashboard') {
+                renderAdminDashboard();
+            } else if (tabId === 'data-tab') {
+                updateDataStatistics();
+            }
+        }
+        
+        // Study section functions with enhanced UI
+        function loadTopics() {
+            const topics = [...new Set(questions.map(q => q.topic))].sort();
+            const studyTopicSelect = document.getElementById('study-topic-select');
+            studyTopicSelect.innerHTML = '<option value="">All Topics</option>';
+            topics.forEach(topic => {
+                const option = document.createElement('option');
+                option.value = topic;
+                option.textContent = topic;
+                studyTopicSelect.appendChild(option);
+            });
+        }
+        
+        function renderQuestions() {
+            // Only render paginated questions if no study session is active
+            if (currentStudySession.active) return;
+
+            const searchTerm = document.getElementById('study-search').value.toLowerCase();
+            const selectedTopic = document.getElementById('study-topic-select').value;
+            const selectedDifficulty = document.getElementById('study-difficulty-select').value;
+            
+            // Filter questions
+            let filteredQuestions = questions.filter(question => {
+                const matchesSearch = question.text.toLowerCase().includes(searchTerm) || 
+                                     question.topic.toLowerCase().includes(searchTerm);
+                const matchesTopic = !selectedTopic || question.topic === selectedTopic;
+                const matchesDifficulty = !selectedDifficulty || question.difficulty === selectedDifficulty;
+                
+                return matchesSearch && matchesTopic && matchesDifficulty;
+            });
+            
+            // Show first 3 questions only (no pagination during study)
+            const displayQuestions = filteredQuestions.slice(0, 3);
+            
+            // Render questions
+            const questionsContainer = document.getElementById('questions-container');
+            questionsContainer.innerHTML = '';
+            
+            if (displayQuestions.length === 0) {
+                questionsContainer.innerHTML = `
+                    <div class="question-card p-8 rounded-xl shadow-lg text-center">
+                        <div class="text-6xl mb-4">🔍</div>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No questions found</h3>
+                        <p class="text-gray-500 dark:text-gray-400">Try adjusting your search filters or add some questions!</p>
+                    </div>
+                `;
+            } else {
+                displayQuestions.forEach((question, index) => {
+                    const questionEl = document.createElement('div');
+                    questionEl.className = 'question-card p-6 rounded-xl shadow-lg border-l-4 border-primary';
+                    questionEl.dataset.questionId = question.id;
+                    
+                    const difficultyColor = question.difficulty === 'easy' ? 'text-green-500' : 
+                                          question.difficulty === 'medium' ? 'text-yellow-500' : 'text-red-500';
+                    
+                    const difficultyEmoji = question.difficulty === 'easy' ? '🟢' : 
+                                           question.difficulty === 'medium' ? '🟡' : '🔴';
+                    
+                    let optionsHtml = question.options.map(opt => {
+                        return `<button class="option answer-option w-full text-left p-4 rounded-lg transition-all text-responsive flex items-center" data-option-id="${opt.id}">
+                            <span class="w-8 h-8 rounded-full border-2 border-current flex items-center justify-center mr-3 text-sm font-medium">${String.fromCharCode(65 + question.options.indexOf(opt))}</span>
+                            <span class="text-gray-900 dark:text-white">${opt.text}</span>
+                        </button>`;
+                    }).join('');
+                    
+                    questionEl.innerHTML = `
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Preview Question ${index + 1}</span>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">📚 ${question.topic}</span>
+                                    <span class="text-sm ${difficultyColor} font-medium">${difficultyEmoji} ${question.difficulty}</span>
+                                    ${question.explanation ? '<button class="view-explanation text-sm text-blue-500 hover:text-blue-600 font-medium">💡 View Explanation</button>' : ''}
+                                </div>
+                            </div>
+                            <h3 class="text-xl font-medium text-gray-900 dark:text-white leading-relaxed">${question.text}</h3>
+                        </div>
+                        <div class="space-y-3 mb-6">${optionsHtml}</div>
+                        <div class="text-center">
+                            <div class="text-sm text-gray-500 dark:text-gray-400">
+                                💡 Start a study session to answer questions
+                            </div>
+                        </div>
+                    `;
+                    
+                    questionsContainer.appendChild(questionEl);
+
+                    // Add explanation button listener
+                    const explanationBtn = questionEl.querySelector('.view-explanation');
+                    if (explanationBtn) {
+                        explanationBtn.addEventListener('click', () => {
+                            showExplanationModal(question);
+                        });
+                    }
+                });
+                
+                // Add call-to-action if user is just browsing
+                const ctaEl = document.createElement('div');
+                ctaEl.className = 'bg-gradient-to-r from-primary to-purple-600 text-white p-6 rounded-xl shadow-lg text-center';
+                ctaEl.innerHTML = `
+                    <h3 class="text-xl font-bold mb-2">Ready to start learning? 🚀</h3>
+                    <p class="mb-4 opacity-90">Start a study session to track your progress and improve your knowledge!</p>
+                    <button onclick="document.getElementById('start-study-session').click()" class="bg-white text-primary hover:bg-gray-100 px-6 py-3 rounded-lg font-medium transition-colors">
+                        Start Study Session
+                    </button>
+                `;
+                questionsContainer.appendChild(ctaEl);
+            }
+        }
+        
+        function handleAnswerSelection(e) {
+            // Disabled during preview mode - redirect to study session
+            showToastNotification('Start a study session to answer questions! 🎯', 'info');
+            document.getElementById('start-study-session').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Enhanced progress section with better visualizations
+        function renderProgress() {
+            if (!currentUser || !userProgress[currentUser.id]) {
+                renderEmptyProgress();
+                return;
+            }
+            
+            const progress = userProgress[currentUser.id];
+            document.getElementById('total-attempted').textContent = progress.attempted || 0;
+            document.getElementById('total-correct').textContent = progress.correct || 0;
+            document.getElementById('best-streak').textContent = progress.bestStreak || 0;
+            
+            // Format study time
+            const totalMinutes = Math.floor((progress.totalStudyTime || 0) / 60);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            document.getElementById('study-time').textContent = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+            
+            // Render topic performance
+            renderTopicPerformance(progress);
+            
+            // Render recent activity
+            const recentActivity = document.getElementById('recent-activity');
+            recentActivity.innerHTML = '';
+            if (!progress.recent || progress.recent.length === 0) {
+                recentActivity.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="text-4xl mb-4">📊</div>
+                        <p class="text-gray-500 dark:text-gray-400">No recent activity yet. Start studying to see your progress!</p>
+                    </div>
+                `;
+            } else {
+                progress.recent.forEach(activity => {
+                    const activityEl = document.createElement('div');
+                    activityEl.className = 'border-b border-gray-200 dark:border-gray-600 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0';
+                    const statusColor = activity.isCorrect ? 'text-green-500' : 'text-red-500';
+                    const statusIcon = activity.isCorrect ? '✅' : '❌';
+                    activityEl.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">${statusIcon}</span>
+                                <strong class="text-gray-900 dark:text-white">${activity.topic}</strong>
+                            </div>
+                            <span class="${statusColor} font-medium text-sm">
+                                ${activity.isCorrect ? 'Correct' : 'Incorrect'}
+                            </span>
+                        </div>
+                        <div class="text-gray-700 dark:text-gray-300 mb-2 ml-6">${activity.questionText}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 ml-6">
+                            ${formatDate(activity.timestamp)}
+                        </div>
+                    `;
+                    recentActivity.appendChild(activityEl);
+                });
+            }
+        }
+
+        function renderEmptyProgress() {
+            document.getElementById('total-attempted').textContent = '0';
+            document.getElementById('total-correct').textContent = '0';
+            document.getElementById('best-streak').textContent = '0';
+            document.getElementById('study-time').textContent = '0m';
+            
+            document.getElementById('topic-performance').innerHTML = `
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-4">📈</div>
+                    <p class="text-gray-500 dark:text-gray-400">Start studying to see your performance by topic!</p>
+                </div>
+            `;
+            
+            document.getElementById('recent-activity').innerHTML = `
+                <div class="text-center py-8">
+                    <div class="text-4xl mb-4">📊</div>
+                    <p class="text-gray-500 dark:text-gray-400">No recent activity yet. Start studying to see your progress!</p>
+                </div>
+            `;
+        }
+
+        function renderTopicPerformance(progress) {
+            const topicPerformance = document.getElementById('topic-performance');
+            topicPerformance.innerHTML = '';
+            
+            if (!progress.byTopic || Object.keys(progress.byTopic).length === 0) {
+                topicPerformance.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="text-4xl mb-4">📈</div>
+                        <p class="text-gray-500 dark:text-gray-400">Start studying to see your performance by topic!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            Object.entries(progress.byTopic).forEach(([topic, stats]) => {
+                const accuracy = stats.attempted > 0 ? Math.round((stats.correct / stats.attempted) * 100) : 0;
+                const performanceColor = accuracy >= 80 ? 'bg-green-500' : accuracy >= 60 ? 'bg-yellow-500' : 'bg-red-500';
+                
+                const topicEl = document.createElement('div');
+                topicEl.className = 'mb-4 last:mb-0';
+                topicEl.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-medium text-gray-900 dark:text-white">${topic}</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">${stats.correct}/${stats.attempted} (${accuracy}%)</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div class="${performanceColor} h-2 rounded-full transition-all duration-500" style="width: ${accuracy}%"></div>
+                    </div>
+                `;
+                topicPerformance.appendChild(topicEl);
+            });
+        }
+
+        // Question management functions with enhanced validation
+        function renderQuestionsList() {
+            const searchTerm = document.getElementById('question-search').value.toLowerCase();
+            
+            // Filter questions
+            let filteredQuestions = questions.filter(question => {
+                return question.text.toLowerCase().includes(searchTerm) || 
+                       question.topic.toLowerCase().includes(searchTerm);
+            });
+            
+            // Sort by most recent first
+            filteredQuestions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            // Pagination
+            const totalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
+            const startIndex = (currentPage.questions - 1) * itemsPerPage;
+            const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + itemsPerPage);
+            
+            // Render questions
+            const questionsList = document.getElementById('questions-list');
+            questionsList.innerHTML = '';
+            
+            if (paginatedQuestions.length === 0) {
+                questionsList.innerHTML = `
+                    <div class="p-8 text-center">
+                        <div class="text-6xl mb-4">❓</div>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No questions found</h3>
+                        <p class="text-gray-500 dark:text-gray-400">Try adjusting your search or add some questions!</p>
+                    </div>
+                `;
+            } else {
+                paginatedQuestions.forEach(question => {
+                    const createdByUser = users.find(u => u.id === question.createdBy);
+                    const questionEl = document.createElement('div');
+                    questionEl.className = 'p-6 border-b border-gray-200 dark:border-gray-600 last:border-b-0 flex flex-col lg:flex-row lg:items-center gap-4';
+                    questionEl.dataset.questionId = question.id;
+                    
+                    const difficultyColor = question.difficulty === 'easy' ? 'text-green-500' : 
+                                          question.difficulty === 'medium' ? 'text-yellow-500' : 'text-red-500';
+                    
+                    const difficultyEmoji = question.difficulty === 'easy' ? '🟢' : 
+                                           question.difficulty === 'medium' ? '🟡' : '🔴';
+                    
+                    questionEl.innerHTML = `
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-900 dark:text-white mb-2 flex items-center justify-between">
+                                <span>${question.text}</span>
+                                ${question.explanation ? '<button class="view-explanation-btn text-blue-500 hover:text-blue-600 text-sm font-medium">💡 View Explanation</button>' : ''}
+                            </div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400 flex flex-wrap gap-4">
+                                <span>📚 ${question.topic}</span>
+                                <span class="${difficultyColor}">${difficultyEmoji} ${question.difficulty}</span>
+                                <span>Options: ${question.options.length}</span>
+                                <span>Created by: ${createdByUser ? createdByUser.name : 'Unknown'}</span>
+                                <span>📅 ${formatDate(question.createdAt)}</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="edit-question bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors text-sm">
+                                ✏️ Edit
+                            </button>
+                            <button class="delete-question bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors text-sm">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    `;
+                    
+                    questionsList.appendChild(questionEl);
+                });
+            }
+            
+            // Render pagination
+            renderPagination(document.getElementById('questions-pagination'), currentPage.questions, totalPages, 'questions');
+            
+            // Add event listeners
+            document.querySelectorAll('.edit-question').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const questionId = parseInt(e.target.closest('[data-question-id]').dataset.questionId);
+                    editQuestion(questionId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-question').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const questionId = parseInt(e.target.closest('[data-question-id]').dataset.questionId);
+                    deleteQuestion(questionId);
+                });
+            });
+
+            // Add explanation view event listeners
+            document.querySelectorAll('.view-explanation-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const questionId = parseInt(e.target.closest('[data-question-id]').dataset.questionId);
+                    const question = questions.find(q => q.id === questionId);
+                    if (question) {
+                        showExplanationModal(question);
+                    }
+                });
+            });
+        }
+        
+        function showQuestionForm() {
+            currentEditingQuestionId = null;
+            document.getElementById('question-form').classList.remove('hidden');
+            document.getElementById('question-form-title').textContent = '➕ Add New Question';
+            
+            // Reset form
+            document.getElementById('question-text').value = '';
+            document.getElementById('question-topic').value = '';
+            document.getElementById('question-difficulty').value = 'easy';
+            document.getElementById('question-explanation').value = '';
+            
+            // Reset options (keep one)
+            document.getElementById('question-options').innerHTML = '';
+            addOption(true); // Add first option
+            addOption(); // Add second option
+        }
+        
+        function hideQuestionForm() {
+            document.getElementById('question-form').classList.add('hidden');
+        }
+
+        function showJsonImport() {
+            document.getElementById('json-import-section').classList.remove('hidden');
+            document.getElementById('json-editor').value = '';
+        }
+        
+        function hideJsonImport() {
+            document.getElementById('json-import-section').classList.add('hidden');
+        }
+        
+        function addOption(isInitial = false) {
+            const questionOptions = document.getElementById('question-options');
+            const optionCount = questionOptions.querySelectorAll('.option-input').length;
+            
+            if (optionCount >= 6) {
+                showToastNotification('Maximum 6 options allowed per question', 'warning');
+                return;
+            }
+            
+            const optionEl = document.createElement('div');
+            optionEl.className = 'option-input flex items-center gap-3';
+            
+            optionEl.innerHTML = `
+                <input type="text" placeholder="Option text" class="option-text flex-1 px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" class="option-correct w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Correct</span>
+                </label>
+                ${optionCount < 2 ? '' : '<button type="button" class="remove-option bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors">×</button>'}
+            `;
+            
+            questionOptions.appendChild(optionEl);
+            
+            // Add event listener for remove button if not initial
+            if (optionCount >= 2) {
+                optionEl.querySelector('.remove-option').addEventListener('click', () => {
+                    optionEl.remove();
+                });
+            }
+        }
+        
+        function editQuestion(questionId) {
+            const question = questions.find(q => q.id === questionId);
+            if (!question) return;
+            
+            currentEditingQuestionId = questionId;
+            document.getElementById('question-form').classList.remove('hidden');
+            document.getElementById('question-form-title').textContent = '✏️ Edit Question';
+            
+            // Fill form
+            document.getElementById('question-text').value = question.text;
+            document.getElementById('question-topic').value = question.topic;
+            document.getElementById('question-difficulty').value = question.difficulty;
+            document.getElementById('question-explanation').value = question.explanation || '';
+            
+            // Clear options
+            document.getElementById('question-options').innerHTML = '';
+            
+            // Add options
+            question.options.forEach((opt, index) => {
+                const questionOptions = document.getElementById('question-options');
+                const optionEl = document.createElement('div');
+                optionEl.className = 'option-input flex items-center gap-3';
+                
+                optionEl.innerHTML = `
+                    <input type="text" placeholder="Option text" class="option-text flex-1 px-4 py-3 text-base border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary" value="${opt.text}">
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" class="option-correct w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" ${opt.correct ? 'checked' : ''}>
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Correct</span>
+                    </label>
+                    ${index < 2 ? '' : '<button type="button" class="remove-option bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors">×</button>'}
+                `;
+                
+                questionOptions.appendChild(optionEl);
+                
+                // Add event listener for remove button
+                if (index >= 2) {
+                    optionEl.querySelector('.remove-option').addEventListener('click', () => {
+                        optionEl.remove();
+                    });
+                }
+            });
+        }
+        
+        function saveQuestion() {
+            // Check question limit
+            if (!currentEditingQuestionId && questions.length >= maxQuestions) {
+                showAlert(`Maximum ${maxQuestions} questions allowed.`, 'error');
+                return;
+            }
+            
+            const text = document.getElementById('question-text').value.trim();
+            const topic = document.getElementById('question-topic').value.trim();
+            const difficulty = document.getElementById('question-difficulty').value;
+            const explanation = document.getElementById('question-explanation').value.trim();
+            
+            // Get options
+            const optionInputs = document.getElementById('question-options').querySelectorAll('.option-input');
+            const options = [];
+            
+            optionInputs.forEach(input => {
+                const text = input.querySelector('.option-text').value.trim();
+                const correct = input.querySelector('.option-correct').checked;
+                
+                if (text) {
+                    options.push({
+                        id: options.length + 1,
+                        text,
+                        correct
+                    });
+                }
+            });
+            
+            // Enhanced validation
+            if (!text || !topic) {
+                showAlert('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            if (text.length < 10) {
+                showAlert('Question text must be at least 10 characters long', 'error');
+                return;
+            }
+            
+            if (options.length < 2) {
+                showAlert('Please add at least 2 options', 'error');
+                return;
+            }
+            
+            const correctOptions = options.filter(opt => opt.correct).length;
+            if (correctOptions === 0) {
+                showAlert('Please mark at least one correct option', 'error');
+                return;
+            }
+            
+            if (correctOptions > 1) {
+                showAlert('Please mark only one correct option for now', 'error');
+                return;
+            }
+            
+            if (currentEditingQuestionId) {
+                // Update existing question
+                const questionIndex = questions.findIndex(q => q.id === currentEditingQuestionId);
+                if (questionIndex !== -1) {
+                    questions[questionIndex] = {
+                        ...questions[questionIndex],
+                        text,
+                        topic,
+                        difficulty,
+                        options,
+                        explanation: explanation || null,
+                        lastUpdated: new Date().toISOString()
+                    };
+                    
+                    showToastNotification('Question updated successfully! ✏️', 'success');
+                }
+            } else {
+                // Add new question
+                const newQuestion = {
+                    id: questions.length > 0 ? Math.max(...questions.map(q => q.id)) + 1 : 1,
+                    text,
+                    topic,
+                    difficulty,
+                    options,
+                    explanation: explanation || null,
+                    createdBy: currentUser.id,
+                    createdAt: new Date().toISOString(),
+                    lastUpdated: null
+                };
+                
+                questions.push(newQuestion);
+                showToastNotification('Question added successfully! ➕', 'success');
+            }
+            
+            saveData();
+            hideQuestionForm();
+            renderQuestionsList();
+            loadTopics(); // Refresh topics in filter
+        }
+        
+        function deleteQuestion(questionId) {
+            const question = questions.find(q => q.id === questionId);
+            if (!question) return;
+            
+            showConfirmDialog(
+                `Are you sure you want to delete this question? "${question.text.substring(0, 50)}..."`,
+                () => {
+                    const questionIndex = questions.findIndex(q => q.id === questionId);
+                    if (questionIndex !== -1) {
+                        questions.splice(questionIndex, 1);
+                        saveData();
+                        showToastNotification('Question deleted successfully! 🗑️', 'success');
+                        renderQuestionsList();
+                        loadTopics(); // Refresh topics in filter
+                    }
+                },
+                null,
+                'Delete Question'
+            );
+        }
+        
+        // User management functions (similar structure with better UI)
+        function renderUserList() {
+            const searchTerm = document.getElementById('user-search').value.toLowerCase();
+            const roleFilter = document.getElementById('user-role-filter').value;
+            
+            // Filter users
+            let filteredUsers = users.filter(user => {
+                const matchesSearch = user.name.toLowerCase().includes(searchTerm) || 
+                                     user.email.toLowerCase().includes(searchTerm);
+                const matchesRole = !roleFilter || user.role === roleFilter;
+                
+                return matchesSearch && matchesRole;
+            });
+            
+            // Sort by most recent first
+            filteredUsers.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            
+            // Pagination
+            const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+            const startIndex = (currentPage.users - 1) * itemsPerPage;
+            const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+            
+            // Render users
+            const userList = document.getElementById('user-list');
+            userList.innerHTML = '';
+            
+            if (paginatedUsers.length === 0) {
+                userList.innerHTML = `
+                    <div class="p-8 text-center">
+                        <div class="text-6xl mb-4">👥</div>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No users found</h3>
+                        <p class="text-gray-500 dark:text-gray-400">Try adjusting your search or add some users!</p>
+                    </div>
+                `;
+            } else {
+                paginatedUsers.forEach(user => {
+                    let badgeClass = '';
+                    let roleText = '';
+                    let roleIcon = '';
+                    switch(user.role) {
+                        case 'super-admin':
+                            badgeClass = 'bg-gradient-to-r from-orange-500 to-red-500 text-white';
+                            roleText = 'Super Admin';
+                            roleIcon = '👑';
+                            break;
+                        case 'admin':
+                            badgeClass = 'bg-gradient-to-r from-purple-500 to-pink-500 text-white';
+                            roleText = 'Administrator';
+                            roleIcon = '⚙️';
+                            break;
+                        case 'content-admin':
+                            badgeClass = 'bg-gradient-to-r from-teal-500 to-blue-500 text-white';
+                            roleText = 'Teacher';
+                            roleIcon = '📚';
+                            break;
+                        default:
+                            badgeClass = 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
+                            roleText = 'Student';
+                            roleIcon = '🎓';
+                    }
+                    
+                    const userEl = document.createElement('div');
+                    userEl.className = 'p-6 border-b border-gray-200 dark:border-gray-600 last:border-b-0 flex flex-col lg:flex-row lg:items-center gap-4';
+                    userEl.dataset.userId = user.id;
+                    
+                    userEl.innerHTML = `
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-900 dark:text-white mb-2 flex items-center space-x-3">
+                                <span>${user.name}</span>
+                                <span class="inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-medium ${badgeClass}">
+                                    <span>${roleIcon}</span>
+                                    <span>${roleText}</span>
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400 flex flex-wrap gap-4">
+                                <span>📧 ${user.email}</span>
+                                <span>📅 Joined: ${formatDate(user.createdAt)}</span>
+                                <span>🔐 Last login: ${user.lastLogin ? formatDate(user.lastLogin) : 'Never'}</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="edit-user bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors text-sm">
+                                ✏️ Edit
+                            </button>
+                            ${user.id !== currentUser.id ? '<button class="delete-user bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors text-sm">🗑️ Delete</button>' : ''}
+                        </div>
+                    `;
+                    
+                    userList.appendChild(userEl);
+                });
+            }
+            
+            // Render pagination
+            renderPagination(document.getElementById('users-pagination'), currentPage.users, totalPages, 'users');
+            
+            // Add event listeners
+            document.querySelectorAll('.edit-user').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const userId = parseInt(e.target.closest('[data-user-id]').dataset.userId);
+                    editUser(userId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-user').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const userId = parseInt(e.target.closest('[data-user-id]').dataset.userId);
+                    deleteUser(userId);
+                });
+            });
+        }
+        
+        function showUserForm() {
+            currentEditingUserId = null;
+            document.getElementById('user-form').classList.remove('hidden');
+            document.getElementById('user-form-title').textContent = '👤 Add New User';
+            
+            // Reset form
+            document.getElementById('user-name').value = '';
+            document.getElementById('user-email').value = '';
+            document.getElementById('user-password').value = '';
+            
+            // Reset role selection
+            document.querySelectorAll('#user-role-selector .role-option').forEach(opt => {
+                opt.classList.remove('bg-primary', 'text-white', 'border-primary');
+                opt.classList.add('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300');
+                if (opt.dataset.role === 'user') {
+                    opt.classList.add('bg-primary', 'text-white', 'border-primary');
+                    opt.classList.remove('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300');
+                }
+            });
+            document.getElementById('user-role').value = 'user';
+            
+            // Hide super-admin option if not super-admin
+            const superAdminOption = document.querySelector('#user-role-selector .role-option[data-role="super-admin"]');
+            if (superAdminOption) {
+                superAdminOption.style.display = currentUser.role === 'super-admin' ? 'block' : 'none';
+            }
+        }
+        
+        function hideUserForm() {
+            document.getElementById('user-form').classList.add('hidden');
+        }
+        
+        function editUser(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+            
+            currentEditingUserId = userId;
+            document.getElementById('user-form').classList.remove('hidden');
+            document.getElementById('user-form-title').textContent = '✏️ Edit User';
+            
+            // Fill form
+            document.getElementById('user-name').value = user.name;
+            document.getElementById('user-email').value = user.email;
+            document.getElementById('user-password').value = '';
+            
+            // Select role
+            document.querySelectorAll('#user-role-selector .role-option').forEach(opt => {
+                opt.classList.remove('bg-primary', 'text-white', 'border-primary');
+                opt.classList.add('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300');
+                if (opt.dataset.role === user.role) {
+                    opt.classList.add('bg-primary', 'text-white', 'border-primary');
+                    opt.classList.remove('border-gray-300', 'dark:border-gray-600', 'text-gray-700', 'dark:text-gray-300');
+                }
+            });
+            document.getElementById('user-role').value = user.role;
+            
+            // Hide super-admin option if not super-admin
+            const superAdminOption = document.querySelector('#user-role-selector .role-option[data-role="super-admin"]');
+            if (superAdminOption) {
+                superAdminOption.style.display = currentUser.role === 'super-admin' ? 'block' : 'none';
+            }
+        }
+        
+        function saveUser() {
+            const name = document.getElementById('user-name').value.trim();
+            const email = document.getElementById('user-email').value.trim();
+            const password = document.getElementById('user-password').value;
+            const role = document.getElementById('user-role').value;
+            
+            // Enhanced validation
+            if (!name || !email) {
+                showAlert('Please fill in all required fields', 'error');
+                return;
+            }
+            
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAlert('Please enter a valid email address', 'error');
+                return;
+            }
+            
+            if (currentEditingUserId) {
+                // Update existing user
+                const userIndex = users.findIndex(u => u.id === currentEditingUserId);
+                if (userIndex !== -1) {
+                    const updatedUser = {
+                        ...users[userIndex],
+                        name,
+                        email,
+                        role
+                    };
+                    
+                    // Only update password if provided
+                    if (password) {
+                        if (password.length < 6) {
+                            showAlert('Password must be at least 6 characters long', 'error');
+                            return;
+                        }
+                        updatedUser.password = hashPassword(password);
+                    }
+                    
+                    // Prevent changing own role
+                    if (currentEditingUserId === currentUser.id && role !== currentUser.role) {
+                        showAlert('You cannot change your own role', 'error');
+                        return;
+                    }
+                    
+                    // Prevent changing last super-admin
+                    if (users[userIndex].role === 'super-admin' && role !== 'super-admin') {
+                        const superAdminCount = users.filter(u => u.role === 'super-admin').length;
+                        if (superAdminCount <= 1) {
+                            showAlert('Cannot change role of last super admin', 'error');
+                            return;
+                        }
+                    }
+                    
+                    // Check if email is being changed to one that already exists
+                    if (email !== users[userIndex].email && users.some(u => u.email === email && u.id !== currentEditingUserId)) {
+                        showAlert('Email already in use by another user', 'error');
+                        return;
+                    }
+                    
+                    users[userIndex] = updatedUser;
+                    
+                    // Update current user if editing self
+                    if (currentEditingUserId === currentUser.id) {
+                        currentUser = updatedUser;
+                        checkAuth(); // Refresh UI
+                    }
+                    
+                    showToastNotification('User updated successfully! ✏️', 'success');
+                }
+            } else {
+                // Add new user
+                if (!password) {
+                    showAlert('Please enter a password', 'error');
+                    return;
+                }
+                
+                if (password.length < 6) {
+                    showAlert('Password must be at least 6 characters long', 'error');
+                    return;
+                }
+                
+                if (users.some(u => u.email === email)) {
+                    showAlert('Email already in use', 'error');
+                    return;
+                }
+                
+                const newUser = {
+                    id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1,
+                    name,
+                    email,
+                    password: hashPassword(password),
+                    role,
+                    createdAt: new Date().toISOString(),
+                    lastLogin: null
+                };
+                
+                users.push(newUser);
+                showToastNotification('User added successfully! 👤', 'success');
+            }
+            
+            saveData();
+            hideUserForm();
+            renderUserList();
+        }
+        
+        function deleteUser(userId) {
+            if (userId === currentUser.id) {
+                showAlert('You cannot delete yourself', 'error');
+                return;
+            }
+            
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+            
+            // Prevent deleting last super-admin
+            if (user.role === 'super-admin') {
+                const superAdminCount = users.filter(u => u.role === 'super-admin').length;
+                if (superAdminCount <= 1) {
+                    showAlert('Cannot delete last super admin', 'error');
+                    return;
+                }
+            }
+            
+            showConfirmDialog(
+                `Are you sure you want to delete user "${user.name}"? This action cannot be undone.`,
+                () => {
+                    const userIndex = users.findIndex(u => u.id === userId);
+                    if (userIndex !== -1) {
+                        users.splice(userIndex, 1);
+                        
+                        // Also remove user's progress
+                        if (userProgress[userId]) {
+                            delete userProgress[userId];
+                        }
+                        
+                        saveData();
+                        showToastNotification('User deleted successfully! 🗑️', 'success');
+                        renderUserList();
+                    }
+                },
+                null,
+                'Delete User'
+            );
+        }
+        
+        // Admin dashboard functions with enhanced metrics
+        function renderAdminDashboard() {
+            if (!currentUser || !['admin', 'super-admin'].includes(currentUser.role)) return;
+            
+            // Basic stats
+            document.getElementById('total-users').textContent = users.length;
+            document.getElementById('total-questions').textContent = questions.length;
+            
+            // Active today (logged in today)
+            const today = new Date().toISOString().split('T')[0];
+            const activeCount = users.filter(u => u.lastLogin && u.lastLogin.includes(today)).length;
+            document.getElementById('active-today').textContent = activeCount;
+            
+            // System health
+            const systemHealthEl = document.getElementById('system-health');
+            const healthStatus = calculateSystemHealth();
+            systemHealthEl.textContent = healthStatus.status;
+            systemHealthEl.className = `text-3xl font-bold mt-2 ${healthStatus.color}`;
+            
+            // Recent activity (last 5 logins)
+            renderAdminRecentActivity();
+            
+            // Question statistics
+            renderQuestionStats();
+        }
+
+        function calculateSystemHealth() {
+            // Simple health calculation based on various factors
+            let score = 100;
+            
+            // Reduce score if no recent activity
+            const today = new Date();
+            const activeUsers = users.filter(u => {
+                if (!u.lastLogin) return false;
+                const daysSince = Math.floor((today - new Date(u.lastLogin)) / (1000 * 60 * 60 * 24));
+                return daysSince <= 7;
+            }).length;
+            
+            if (activeUsers === 0) score -= 30;
+            else if (activeUsers < users.length * 0.3) score -= 15;
+            
+            // Reduce score if very few questions
+            if (questions.length < 5) score -= 20;
+            
+            // Check data size (rough estimate)
+            const dataSize = new Blob([JSON.stringify({questions, users, userProgress})]).size;
+            if (dataSize > 4 * 1024 * 1024) score -= 10; // >4MB
+            
+            if (score >= 90) return { status: 'Excellent', color: 'text-green-500' };
+            if (score >= 70) return { status: 'Good', color: 'text-green-500' };
+            if (score >= 50) return { status: 'Fair', color: 'text-yellow-500' };
+            return { status: 'Poor', color: 'text-red-500' };
+        }
+
+        function renderAdminRecentActivity() {
+            const adminRecentActivity = document.getElementById('admin-recent-activity');
+            adminRecentActivity.innerHTML = '';
+            const recentLogins = users
+                .filter(u => u.lastLogin)
+                .sort((a, b) => new Date(b.lastLogin) - new Date(a.lastLogin))
+                .slice(0, 5);
+            
+            if (recentLogins.length === 0) {
+                adminRecentActivity.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="text-4xl mb-2">👤</div>
+                        <p class="text-gray-500 dark:text-gray-400">No recent activity</p>
+                    </div>
+                `;
+            } else {
+                recentLogins.forEach(user => {
+                    const activityEl = document.createElement('div');
+                    activityEl.className = 'border-b border-gray-200 dark:border-gray-600 pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0';
+                    
+                    const roleIcon = user.role === 'super-admin' ? '👑' :
+                                    user.role === 'admin' ? '⚙️' :
+                                    user.role === 'content-admin' ? '📚' : '🎓';
+                    
+                    activityEl.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">${roleIcon}</span>
+                                <div>
+                                    <span class="font-medium text-gray-900 dark:text-white">${user.name}</span>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400">${user.email}</div>
+                                </div>
+                            </div>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">${formatDate(user.lastLogin)}</span>
+                        </div>
+                    `;
+                    adminRecentActivity.appendChild(activityEl);
+                });
+            }
+        }
+
+        function renderQuestionStats() {
+            // Question stats by difficulty
+            const difficultyStats = document.getElementById('difficulty-stats');
+            difficultyStats.innerHTML = '';
+            const difficultyCounts = {
+                easy: 0,
+                medium: 0,
+                hard: 0
+            };
+            
+            questions.forEach(q => {
+                difficultyCounts[q.difficulty]++;
+            });
+            
+            for (const [difficulty, count] of Object.entries(difficultyCounts)) {
+                const statItem = document.createElement('li');
+                statItem.className = 'mb-2 flex justify-between items-center';
+                const percentage = questions.length > 0 ? Math.round((count / questions.length) * 100) : 0;
+                const emoji = difficulty === 'easy' ? '🟢' : difficulty === 'medium' ? '🟡' : '🔴';
+                statItem.innerHTML = `
+                    <span class="flex items-center space-x-2">
+                        <span>${emoji}</span>
+                        <span class="capitalize">${difficulty}</span>
+                    </span>
+                    <span><strong>${count}</strong> (${percentage}%)</span>
+                `;
+                difficultyStats.appendChild(statItem);
+            }
+        }
+        
+        function backupData() {
+            exportToJson();
+            systemSettings.lastBackup = new Date().toISOString();
+            saveData();
+            updateBackupInfo();
+            showToastNotification('Backup completed successfully! 💾', 'success');
+        }
+        
+        function resetTestData() {
+            showConfirmDialog(
+                'WARNING: This will reset all data to default test values. Are you sure?',
+                () => {
+                    // Reset to initial test data (simplified)
+                    users = [
+                        { 
+                            id: 1, 
+                            name: 'System Administrator', 
+                            email: 'admin@studymaster.com', 
+                            password: hashPassword('admin123'), 
+                            role: 'super-admin',
+                            createdAt: new Date().toISOString(),
+                            lastLogin: null
+                        },
+                        { 
+                            id: 2, 
+                            name: 'Teacher', 
+                            email: 'teacher@studymaster.com', 
+                            password: hashPassword('teacher123'), 
+                            role: 'content-admin',
+                            createdAt: new Date().toISOString(),
+                            lastLogin: null
+                        },
+                        { 
+                            id: 3, 
+                            name: 'Student', 
+                            email: 'student@studymaster.com', 
+                            password: hashPassword('student123'), 
+                            role: 'user',
+                            createdAt: new Date().toISOString(),
+                            lastLogin: null
+                        }
+                    ];
+                    
+                    // Keep some demo questions but reset progress
+                    userProgress = {};
+                    systemSettings = {
+                        maintenanceMode: false,
+                        allowRegistrations: true,
+                        lastBackup: new Date().toISOString(),
+                        backupReminder: true,
+                        sessionCount: 0
+                    };
+                    
+                    // If current user is not in the test data, log them out
+                    if (!users.some(u => u.id === currentUser?.id)) {
+                        currentUser = null;
+                    }
+                    
+                    saveData();
+                    checkAuth();
+                    showToastNotification('Test data reset successfully! 🔄', 'success');
+                },
+                null,
+                'Reset Test Data'
+            );
+        }
+
+        // Utility functions with enhanced formatting
+        function saveData() {
+            localStorage.setItem('studyMasterUsers', JSON.stringify(users));
+            localStorage.setItem('studyMasterQuestions', JSON.stringify(questions));
+            localStorage.setItem('studyMasterProgress', JSON.stringify(userProgress));
+            localStorage.setItem('studyMasterSettings', JSON.stringify(systemSettings));
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'Never';
+            
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffTime = Math.abs(now - date);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+            const diffMinutes = Math.floor(diffTime / (1000 * 60));
+            
+            if (diffMinutes < 1) return 'Just now';
+            if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+            if (diffHours < 24) return `${diffHours} hours ago`;
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return `${diffDays} days ago`;
+            
+            return date.toLocaleDateString();
+        }
+        
+        function renderPagination(container, currentPageNum, totalPages, pageType) {
+            container.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            // Previous button
+            const prevBtn = document.createElement('button');
+            prevBtn.textContent = '← Previous';
+            prevBtn.className = 'px-4 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors';
+            prevBtn.disabled = currentPageNum === 1;
+            if (prevBtn.disabled) {
+                prevBtn.className += ' cursor-not-allowed opacity-50';
+            }
+            prevBtn.addEventListener('click', () => {
+                if (currentPageNum > 1) {
+                    currentPage[pageType]--;
+                    refreshPage(pageType);
+                }
+            });
+            container.appendChild(prevBtn);
+            
+            // Page buttons (show max 5 pages)
+            const startPage = Math.max(1, currentPageNum - 2);
+            const endPage = Math.min(totalPages, startPage + 4);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = document.createElement('button');
+                pageBtn.textContent = i;
+                pageBtn.className = 'px-3 py-2 text-sm font-medium border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:border-gray-700 dark:hover:bg-gray-700 dark:hover:text-white transition-colors';
+                
+                if (i === currentPageNum) {
+                    pageBtn.className += ' bg-primary text-white border-primary dark:bg-primary';
+                } else {
+                    pageBtn.className += ' text-gray-500 bg-white dark:bg-gray-800 dark:text-gray-400';
+                }
+                
+                pageBtn.addEventListener('click', () => {
+                    currentPage[pageType] = i;
+                    refreshPage(pageType);
+                });
+                container.appendChild(pageBtn);
+            }
+            
+            // Next button
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = 'Next →';
+            nextBtn.className = 'px-4 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white transition-colors';
+            nextBtn.disabled = currentPageNum === totalPages;
+            if (nextBtn.disabled) {
+                nextBtn.className += ' cursor-not-allowed opacity-50';
+            }
+            nextBtn.addEventListener('click', () => {
+                if (currentPageNum < totalPages) {
+                    currentPage[pageType]++;
+                    refreshPage(pageType);
+                }
+            });
+            container.appendChild(nextBtn);
+        }
+        
+        function refreshPage(pageType) {
+            if (pageType === 'study') {
+                renderQuestions();
+            } else if (pageType === 'questions') {
+                renderQuestionsList();
+            } else if (pageType === 'users') {
+                renderUserList();
+            }
+        }
+        
+        // Initialize the app
+        init();
+    </script>
+</body>
+</html>
